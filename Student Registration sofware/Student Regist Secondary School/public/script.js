@@ -12,22 +12,32 @@ let classFees = {
   "upper-sixth": 0,
 };
 
+// Pagination state
+let currentPage = 1;
+let pageSize = 100; // server caps at 100
+let totalCount = 0;
+
 //My Utility Functions
 
   // Show notifications to user
 
 function showNotification(message, type = "info", duration = 3000) {
-    const notification = document.getElementById("notification");
-    notification.textContent = message;
+  const notification = document.getElementById("notification");
+  if (!notification) return;
+  // Accessibility: ensure aria-live region
+  notification.setAttribute('role', 'status');
+  notification.setAttribute('aria-live', 'polite');
+  notification.setAttribute('aria-atomic', 'true');
+  notification.textContent = message;
 
-    // Remove any previous type classes
-    notification.className = "notification";
-    notification.classList.add(type);
-    notification.classList.add("show");
+  // Remove any previous type classes
+  notification.className = "notification";
+  notification.classList.add(type);
+  notification.classList.add("show");
 
-    setTimeout(() => {
-        notification.classList.remove("show");
-    }, duration);
+  setTimeout(() => {
+    notification.classList.remove("show");
+  }, duration);
 }
  
 
@@ -190,6 +200,7 @@ const i18n = {
     deactivateLicenseBtn: 'Deactivate',
     // Notifications
     notifStudentsLoaded: 'Successfully loaded students',
+    notifStudentsFound: 'Found {count} student(s)',
     notifErrorLoadingStudents: 'Error loading students',
     notifStudentAdded: 'Student added successfully',
     notifStudentUpdated: 'Student updated successfully',
@@ -220,6 +231,7 @@ const i18n = {
     series: 'Series',
     allDepartments: 'All Departments',
     allSeries: 'All Series',
+    notifStudentsFound: 'Found {count} student(s)',
   },
   fr: {
     appTitle: 'Inscription des Élèves',
@@ -320,6 +332,7 @@ const i18n = {
     deactivateLicenseBtn: 'Désactiver',
     // Notifications
     notifStudentsLoaded: 'Liste des élèves chargée avec succès',
+    notifStudentsFound: '{count} élève(s) trouvé(s)',
     notifErrorLoadingStudents: 'Erreur lors du chargement des élèves',
     notifStudentAdded: "Élève ajouté avec succès",
     notifStudentUpdated: "Élève mis à jour avec succès",
@@ -593,10 +606,13 @@ if (departmentSelect) {
 // State
 let students = [];
 let filteredStudents = [];
+let lastActionWasSearch = false; // track if the last fetch was triggered by search
 
 // Loader state (throttled to avoid flicker)
 let loaderTimer = null;
 let loaderVisible = false;
+// Debounce timer for live search
+let searchDebounceTimer = null;
 
 // Loader helpers (throttled show)
 function showLoader(text = 'Loading...', delayMs = 150) {
@@ -645,27 +661,67 @@ function setButtonLoading(btn, isLoading, textWhileLoading = null) {
   }
 }
 
-// Fetch All Students from Backend
+// Fetch Students from Backend (server-side pagination + filters)
+
+// Pagination UI elements
+const prevPageBtn = document.getElementById('prevPageBtn');
+const nextPageBtn = document.getElementById('nextPageBtn');
+const pageInfoEl = document.getElementById('pageInfo');
+const totalInfoEl = document.getElementById('totalInfo');
+
+function updatePaginationUI() {
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  if (pageInfoEl) pageInfoEl.textContent = `Page ${currentPage} / ${totalPages}`;
+  if (totalInfoEl) totalInfoEl.textContent = totalCount ? `Total: ${totalCount}` : '';
+  if (prevPageBtn) prevPageBtn.disabled = currentPage <= 1;
+  if (nextPageBtn) nextPageBtn.disabled = currentPage >= totalPages;
+}
 
 async function fetchStudents() {
   showLoader(t('loading'));
   try {
     const statusSel = (searchStatus && searchStatus.value) || 'active';
-    const includeInactive = statusSel === 'inactive' || statusSel === 'all';
-    const qs = includeInactive ? '?includeInactive=true' : '';
-    const response = await fetch(apiUrl('/api/students' + qs));
-    if (!response.ok) throw new Error('Failed to fetch students');
-    students = await response.json();
-    // Apply status filter if not 'all'
-    let base = [...students];
-    if (statusSel !== 'all') {
-      const wantInactive = statusSel === 'inactive';
-      base = base.filter(s => ((s.status || 'active') === 'inactive') === wantInactive);
+    const params = new URLSearchParams();
+    params.set('page', String(currentPage));
+    params.set('pageSize', String(pageSize));
+
+    // status/includeInactive
+    if (statusSel === 'all') {
+      params.set('includeInactive', 'true');
+    } else {
+      params.set('status', statusSel); // 'active' or 'inactive'
     }
-    filteredStudents = base;
+
+    // Filters from UI
+    const hasQ = !!(searchInput && searchInput.value.trim());
+    const hasClass = !!(searchClass && searchClass.value);
+    const hasGender = !!(searchGender && searchGender.value);
+    const hasDept = !!(searchDepartment && searchDepartment.value);
+    const hasSeries = !!(searchSeries && searchSeries.value);
+    if (hasQ) params.set('q', searchInput.value.trim());
+    if (hasClass) params.set('classLevel', searchClass.value);
+    if (hasGender) params.set('gender', searchGender.value);
+    if (hasDept) params.set('department', searchDepartment.value);
+    if (hasSeries) params.set('series', searchSeries.value);
+
+    const url = apiUrl(`/api/students?${params.toString()}`);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch students');
+    const payload = await response.json();
+    const rows = Array.isArray(payload) ? payload : (payload.data || []);
+    totalCount = Array.isArray(payload) ? rows.length : (payload.total || rows.length || 0);
+
+    students = rows;
+    filteredStudents = rows; // already filtered server-side
     renderStudents(filteredStudents);
-    updateStats(students); // Update stats after fetching
-    showNotification(t('notifStudentsLoaded'), 'info');
+    updateStats(filteredStudents);
+    updatePaginationUI();
+    if (lastActionWasSearch) {
+      showNotification(tf('notifStudentsFound', { count: totalCount }), 'info');
+    } else {
+      showNotification(t('notifStudentsLoaded'), 'info');
+    }
+    lastActionWasSearch = false;
   } catch (error) {
     showNotification(t('notifErrorLoadingStudents'), 'error');
   } finally {
@@ -1142,6 +1198,7 @@ async function onReactivateStudent(e) {
 // Refresh list when status filter changes (Active/Inactive/All)
 if (searchStatus) {
   searchStatus.addEventListener('change', () => {
+    currentPage = 1;
     fetchStudents();
   });
 }
@@ -1149,70 +1206,31 @@ if (searchStatus) {
 // Search Logic - filter students based on search criteria
 
 searchBtn.addEventListener('click', async () => {
-  // Ensure we have up-to-date data per selected status before filtering
+  currentPage = 1;
+  lastActionWasSearch = true;
   await fetchStudents();
-  const nameTerm = searchInput.value.trim().toLowerCase();
-  const classTerm = searchClass.value;
-  const genderTerm = searchGender.value;
-  const ageTerm = searchAge.value ? parseInt(searchAge.value) : null;
-  const statusSel = (searchStatus && searchStatus.value) || 'active';
-  const deptTerm = searchDepartment ? searchDepartment.value : '';
-  const seriesTerm = searchSeries ? searchSeries.value : '';
-
-  const pool = (statusSel === 'all') ? students : students.filter(s => ((s.status || 'active') === 'inactive') === (statusSel === 'inactive'));
-
-  filteredStudents = pool.filter(student => {
-    const fullName = (student.firstName + ' ' + student.lastName).toLowerCase();
-    const matricule = (student.matricule || '').toLowerCase();
-    const studentAge = calculateAge(student.dob);
-    const requiredFees = classFees[student.classLevel] || 0;
-    const isCompleted = student.feesPaid >= requiredFees;
-
-    // Match name, matricule, or numeric ID
-    const nameMatches = fullName.includes(nameTerm)
-      || matricule.includes(nameTerm)
-      || String(student.id).includes(nameTerm);
-
-    // Match class if selected
-    const classMatches = classTerm ? (student.classLevel === classTerm) : true;
-
-    // Match gender if selected
-    const genderMatches = genderTerm ? (student.gender === genderTerm) : true;
-
-    // Match age if entered
-    const ageMatches = ageTerm !== null ? (studentAge === ageTerm) : true;
-
-    // Match fee status if selected
-    const feeStatusMatches = searchFeeStatus && searchFeeStatus.value
-      ? (searchFeeStatus.value === 'completed' ? isCompleted : !isCompleted)
-      : true;
-
-    // Match department if selected
-    const deptMatches = deptTerm ? ((student.department || '') === deptTerm) : true;
-    // Match series if selected
-    const seriesMatches = seriesTerm ? ((student.series || '') === seriesTerm) : true;
-
-    return nameMatches && classMatches && genderMatches && ageMatches && feeStatusMatches && deptMatches && seriesMatches;
-  });
-
-  // Always clear any existing list before rendering new results
-  const studentsContainer = document.getElementById('students-container')
-    || document.getElementById('students-list')
-    || document.querySelector('.students-container')
-    || document.querySelector('.students-list');
-  if (studentsContainer) studentsContainer.innerHTML = '';
-
-  const count = filteredStudents.length;
-  if (count === 0) {
-    renderStudents([]);
-    updateStats([]);
-    showNotification(`${count} student${count === 1 ? '' : 's'} found.`, 'info');
-  } else {
-    renderStudents(filteredStudents);
-    updateStats(filteredStudents);
-    showNotification(`${count} student${count === 1 ? '' : 's'} found.`, 'info');
-  }
 });
+
+// Enter key on search input triggers count-aware search
+if (searchInput) {
+  searchInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      currentPage = 1;
+      lastActionWasSearch = true;
+      await fetchStudents();
+    }
+  });
+  // Debounced live search (no count notification)
+  searchInput.addEventListener('input', () => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      currentPage = 1;
+      lastActionWasSearch = false;
+      fetchStudents();
+    }, 350);
+  });
+}
 
 // Reset Search Filters and Show All Students
 
@@ -1225,8 +1243,29 @@ resetSearchBtn.addEventListener('click', () => {
   if (searchStatus) searchStatus.value = 'active';
   if (searchDepartment) searchDepartment.value = '';
   if (searchSeries) searchSeries.value = '';
+  currentPage = 1;
+  lastActionWasSearch = false;
   fetchStudents();
 });
+
+// Pagination buttons
+if (prevPageBtn) {
+  prevPageBtn.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      fetchStudents();
+    }
+  });
+}
+if (nextPageBtn) {
+  nextPageBtn.addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (currentPage < totalPages) {
+      currentPage++;
+      fetchStudents();
+    }
+  });
+}
 
 // Print All Students (table layout, includes First/Last Name, Class, Dept, Fees owed)
 

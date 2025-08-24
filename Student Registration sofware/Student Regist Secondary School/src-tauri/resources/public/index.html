@@ -296,7 +296,15 @@
       </div>
       <!-- Student cards will be rendered here by JS -->
     </div>
-    
+
+    <!-- Pagination controls -->
+    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:12px; justify-content:center; margin: 16px 0;">
+      <button id="prevPageBtn" class="btn" type="button">Prev</button>
+      <span id="pageInfo">Page 1</span>
+      <button id="nextPageBtn" class="btn" type="button">Next</button>
+      <span id="totalInfo" style="color:#666"></span>
+    </div>
+
     <div class="class-fees-section">
       <form id="class-fees-form">
         <h3><i class="fas fa-money-bill"></i> <span data-i18n="setClassFees">Set Class Fees</span></h3>
