@@ -496,8 +496,9 @@ window.addEventListener('beforeprint', () => {
 // DOM References
 
 const studentForm = document.getElementById('student-form');
-const studentContainer = document.getElementById('studentContainer');
-const notification = document.getElementById('notification');
+const profilePicInput = document.getElementById('profile-pic');
+const preview = document.getElementById('profilePicPreview');
+const head = document.getElementById('school-logo');
 const loader = document.getElementById('loader');
 const loaderText = document.getElementById('loader-text');
 
@@ -510,6 +511,8 @@ const searchBtn = document.getElementById('search-btn');
 const resetSearchBtn = document.getElementById('reset-search-btn');
 const printAllBtn = document.getElementById('print-all-btn');
 const sortBySelect = document.getElementById('sort-by');
+const searchDepartment = document.getElementById('search-department');
+const searchSeries = document.getElementById('search-series');
 const sortBtn = document.getElementById('sort-btn');
 const searchStatus = document.getElementById('search-status');
 
@@ -927,7 +930,12 @@ studentForm.addEventListener('submit', async (e) => {
     formData.append('classLevel', classLevel);
     formData.append('feesPaid', feesPaid);
     formData.append('phone', phone);
-
+    // Also include Department and Series if available
+    const deptVal = (typeof departmentSelect !== 'undefined' && departmentSelect) ? (departmentSelect.value || '') : '';
+    const seriesVal = (typeof seriesSelect !== 'undefined' && seriesSelect) ? (seriesSelect.value || '') : '';
+    formData.append('department', deptVal);
+    formData.append('series', seriesVal);
+    
     let response;
     if (id) {
       // Update existing student
@@ -1341,7 +1349,6 @@ const schoolLogoInput = document.getElementById('logo');
 const schoolCodeInput = document.getElementById('school-code');
 const academicYearInput = document.getElementById('academic-year');
 const regenerateBtn = document.getElementById('regenerate-matricules-btn');
-const head = document.getElementById('school-logo');
 
 schoolForm.addEventListener('submit', async (e) => {
   e.preventDefault();
