@@ -1,0 +1,23 @@
+{
+  "name": "blueledger-s",
+  "version": "1.0.0",
+  "description": "BlueLedger S - Student Registration Secondary desktop app (Tauri + Express + SQLite)",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "dev": "tauri dev",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "node scripts/sync-resources.js && tauri build",
+    "license:ui": "node tools/license-maker/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.1",
+    "sqlite3": "^5.1.7",
+    "wait-on": "^8.0.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.7.1"
+  }
+}

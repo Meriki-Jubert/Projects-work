@@ -1,0 +1,40 @@
+{
+  "package": {
+    "productName": "Student Registration Secondary",
+    "version": "0.1.0"
+  },
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "devPath": "public",
+    "distDir": "public"
+  },
+  "tauri": {
+    "bundle": {
+      "identifier": "com.yourorg.studentreg.secondary"
+    },
+    "windows": [
+      {
+        "title": "Student Registration",
+        "width": 1280,
+        "height": 800
+      }
+    ],
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      }
+    },
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:4001; connect-src 'self' http://127.0.0.1:4001; media-src 'self' http://127.0.0.1:4001; font-src 'self' data:"
+    },
+    "embeddedServer": {
+      "active": false
+    },
+    "updater": {
+      "active": false
+    }
+  }
+}

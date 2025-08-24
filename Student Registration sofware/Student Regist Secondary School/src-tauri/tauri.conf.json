@@ -1,0 +1,38 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "BlueLedger S",
+  "version": "0.1.0",
+  "identifier": "com.blueledger.s",
+  "build": {
+    "frontendDist": "../public"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "BlueLedger S",
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "../build/icon.ico"
+    ],
+    "resources": [
+      "resources/node.exe",
+      "resources/Backend",
+      "resources/public",
+      "resources/BlueLedgerBackend-S.xml",
+      "resources/BlueLedgerBackend-S.exe",
+      "resources/Service-Troubleshooting-S.txt"
+    ]
+  }
+}

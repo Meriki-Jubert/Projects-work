@@ -1,0 +1,153 @@
+uBlueLedger S Backend Service - Debug & Restart Guide
+
+Where things are installed (default):
+- App install dir: %LocalAppData%\BlueLedger
+- Resources dir: %LocalAppData%\BlueLedger\resources
+- Data dir: C:\ProgramData\BlueLedger-S
+- Service name: BlueLedger S Backend (service id: BlueLedgerBackend-S)
+
+Quick checks
+1) Is the service running?
+   - PowerShell (Admin):
+     sc query BlueLedgerBackend-S
+     Get-Service BlueLedgerBackend-S | Select-Object Status,Name,DisplayName
+
+2) Is port 4001 listening?
+   - PowerShell / CMD:
+     netstat -ano | findstr :4001
+     Test-NetConnection -ComputerName 127.0.0.1 -Port 4001
+
+3) Can you reach the server?
+   - Browser: http://127.0.0.1:4001/
+   - PowerShell:
+     (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:4001/ -TimeoutSec 5).StatusCode
+   - CMD/PowerShell (curl):
+     curl -I http://127.0.0.1:4001/
+
+4) Which process owns port 4001?
+   - PowerShell / CMD:
+     for /f "tokens=5" %p in ('netstat -ano ^| findstr :4001 ^| findstr LISTENING') do @echo PID=%p
+     tasklist /fi "PID eq <PID>"
+     Get-Process -Id <PID>
+
+Logs
+- Location: %LocalAppData%\BlueLedger\resources\
+  - BlueLedgerBackend-S.out.log (normal output)
+  - BlueLedgerBackend-S.err.log (errors)
+- Tail logs (PowerShell):
+  Get-Content "$env:LocalAppData\BlueLedger\resources\BlueLedgerBackend-S.err.log" -Tail 100
+  Get-Content "$env:LocalAppData\BlueLedger\resources\BlueLedgerBackend-S.out.log" -Tail 100
+ - Follow logs live (PowerShell):
+   Get-Content "$env:LocalAppData\BlueLedger\resources\BlueLedgerBackend-S.err.log" -Wait -Tail 50
+   Get-Content "$env:LocalAppData\BlueLedger\resources\BlueLedgerBackend-S.out.log" -Wait -Tail 50
+ - Open in Notepad:
+   notepad "$env:LocalAppData\BlueLedger\resources\BlueLedgerBackend-S.err.log"
+ - Clear (truncate) a log if needed (will be re-created):
+   '' | Set-Content "$env:LocalAppData\BlueLedger\resources\BlueLedgerBackend-S.err.log"
+
+Start/Stop/Restart the service
+- From resources dir (PowerShell as Admin):
+  cd %LocalAppData%\BlueLedger\resources
+  .\BlueLedgerBackend-S.exe stop
+  .\BlueLedgerBackend-S.exe start
+  # or restart
+  .\BlueLedgerBackend-S.exe stop; Start-Sleep -Seconds 1; .\BlueLedgerBackend-S.exe start
+ - Additional WinSW commands:
+   .\BlueLedgerBackend-S.exe status
+   .\BlueLedgerBackend-S.exe restart
+ - Windows Service commands (alternative):
+   sc stop BlueLedgerBackend-S
+   sc start BlueLedgerBackend-S
+   Restart-Service -Name BlueLedgerBackend-S -Force
+
+Reinstall the service (repairs a broken install)
+- From resources dir (Admin):
+  .\BlueLedgerBackend-S.exe stop
+  .\BlueLedgerBackend-S.exe uninstall
+  .\BlueLedgerBackend-S.exe install
+  .\BlueLedgerBackend-S.exe start
+ - Verify service after reinstall:
+   .\BlueLedgerBackend-S.exe status
+   sc query BlueLedgerBackend-S
+
+Common issues & fixes
+1) ENOENT creating uploads directory in logs
+   - Ensure folders exist and permissions:
+     New-Item -ItemType Directory -Force -Path 'C:\ProgramData\BlueLedger-S' | Out-Null
+     New-Item -ItemType Directory -Force -Path 'C:\ProgramData\BlueLedger-S\uploads' | Out-Null
+     icacls 'C:\ProgramData\BlueLedger-S' /grant 'LOCAL SERVICE:(OI)(CI)M' /T /C
+     icacls 'C:\ProgramData\BlueLedger-S\uploads' /grant 'LOCAL SERVICE:(OI)(CI)M' /T /C
+
+2) Browser says "This site can’t be reached"
+   - Check port and service status (see Quick checks).
+   - Add a firewall rule if needed (Admin):
+     New-NetFirewallRule -DisplayName "BlueLedger S Backend 4001" -Direction Inbound -Protocol TCP -LocalPort 4001 -Action Allow
+   - Verify firewall rule exists:
+      netsh advfirewall firewall show rule name="BlueLedger S Backend 4001"
+   - Remove firewall rule (if you need to re-add):
+      netsh advfirewall firewall delete rule name="BlueLedger S Backend 4001"
+
+3) MODULE_NOT_FOUND for Backend/server.js or native modules
+   - Verify resources contain:
+     %LocalAppData%\BlueLedger\resources\Backend\server.js
+     %LocalAppData%\BlueLedger\resources\Backend\node_modules (should include sqlite3)
+     %LocalAppData%\BlueLedger\resources\node.exe
+   - Reinstall the app if missing. For dev builds, ensure prod deps are installed:
+     npm ci --omit=dev --prefix <project>\Backend
+   - List expected files quickly:
+      dir "$env:LocalAppData\BlueLedger\resources"
+      dir "$env:LocalAppData\BlueLedger\resources\Backend"
+      dir "$env:LocalAppData\BlueLedger\resources\Backend\node_modules\sqlite3\build\Release"
+
+4) sqlite3 binding errors
+   - Ensure sqlite3 is installed under Backend/node_modules for Windows x64.
+   - Rebuild the installer on the same architecture as the target machine.
+
+5) Port 4001 already in use
+   - Identify process:
+     netstat -ano | findstr :4001
+   - Kill the conflicting PID (Admin):
+     taskkill /PID <PID> /F
+   - Restart the service.
+   - If the PID is a service and won’t stop, try:
+      Stop-Process -Id <PID> -Force
+
+Manual run (for quick diagnosis)
+- From resources dir (Admin):
+  $env:APP_DATA_DIR = 'C:\ProgramData\BlueLedger-S'
+  $env:PUBLIC_DIR   = "$env:LocalAppData\BlueLedger\resources\public"
+  $env:NODE_PATH    = "$env:LocalAppData\BlueLedger\resources\Backend\node_modules"
+  .\node.exe .\Backend\server.js
+  # Press Ctrl+C to stop, then start the service again.
+
+Event Viewer (additional errors)
+- Open Event Viewer:
+  eventvwr.msc
+- Check Windows Logs > Application for entries from WinSW / BlueLedgerBackend.
+  (S variant service id: BlueLedgerBackend-S)
+
+Permissions diagnostics
+- Show current ACLs:
+  icacls "C:\ProgramData\BlueLedger-S"
+  icacls "C:\ProgramData\BlueLedger-S\uploads"
+- Re-apply permissions (Admin):
+  icacls "C:\ProgramData\BlueLedger-S" /grant "LOCAL SERVICE:(OI)(CI)M" /T /C
+  icacls "C:\ProgramData\BlueLedger-S\uploads" /grant "LOCAL SERVICE:(OI)(CI)M" /T /C
+
+Persistence & startup
+- The service is configured to restart on failure and start at boot.
+- If it does not auto-start after reboot:
+  - Check Services (services.msc) for "BlueLedger S Backend" and start it.
+  - Review logs and apply the fixes above.
+
+Support data to collect
+- Screenshots of Services status.
+- Last 200 lines of err/out logs.
+ - Output of: sc query BlueLedgerBackend-S, netstat -ano | findstr :4001
+- Any antivirus prompts or blocks.
+
+Support contact
+- Developer: Meriki Jubert (Software Engineering Student, 2025)
+- Email: merikijubert27@gmail.com
+- Phone/WhatsApp: +237 675086269
+- Location: Cameroon

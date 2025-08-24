@@ -1,0 +1,31 @@
+<service>
+  <id>BlueLedgerBackend-S</id>
+  <name>BlueLedger S Backend</name>
+  <description>Node.js backend service for BlueLedger S (Student Registration System)</description>
+
+  <!-- Run Node with your backend script; working directory is the app's Resources folder -->
+  <executable>node.exe</executable>
+  <arguments>Backend\server.js</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <!-- Ensure environment points to correct data and public directories -->
+  <env name="APP_DATA_DIR" value="%PROGRAMDATA%\BlueLedger-S" />
+  <env name="PUBLIC_DIR" value="%BASE%\public" />
+  <env name="NODE_PATH" value="%BASE%\node_modules" />
+  <stopexecutable>taskkill</stopexecutable>
+  <stoparguments>/F /IM node.exe</stoparguments>
+
+  <!-- Log rotation -->
+  <log mode="roll-by-size-time">
+    <sizeThreshold>10485760</sizeThreshold> <!-- 10MB -->
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <keepFiles>7</keepFiles>
+  </log>
+
+  <!-- Restart on failure -->
+  <onfailure action="restart" delay="10 sec" />
+
+  <!-- Account to run under (LocalService has limited privileges) -->
+  <serviceaccount>LocalService</serviceaccount>
+</service>

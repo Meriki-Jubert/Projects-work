@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Registration System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+        <button id="theme-toggle" class="btn btn-secondary" aria-label="Toggle theme">🌙 Dark</button>
+      </div>
+      <!-- Top toolbar additions: Language selector -->
+      <div class="toolbar-row" id="language-toolbar" style="display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-bottom:8px;">
+        <label for="language-select" style="font-weight:600;" data-i18n="languageLabel">Language:</label>
+        <select id="language-select" class="input" style="max-width:200px;">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+        </select>
+      </div>
+      <div class="school-logo" id="school-logo">
+      </div>
+      <h1><i class="fas fa-graduation-cap"></i><span id="school-name-display"></span></h1><h1 data-i18n="appTitle">Registration System</h1>
+      <p data-i18n="appDescription">Complete student management solution with registration, fees tracking, and records management</p>
+    </header>
+    <div id="license-banner" class="license-banner hidden">
+      <span id="license-banner-text"></span>
+      <button id="license-manage-btn" class="btn btn-link"><span data-i18n="licenseManageBtn">Manage License</span></button>
+    </div>
+    <div class="school-name">
+      <h2><i class="fas fa-school"></i> <span data-i18n="schoolSectionTitle">School</span></h2>
+      <form>
+        <div class="form-group">
+          <i class="fas fa-school"></i>
+          <label for="name" data-i18n="labelSchoolName">Enter Your School Name</label>
+          <input type="text" id="name" class="input" placeholder="e.g. St. Joseph's High School">
+        </div>
+        <div class="form-group">
+          <i class="fas fa-image"></i>
+          <label for="logo" data-i18n="labelLogo">Logo</label>
+          <input type="file" id="logo" name="logo" accept="image/*">
+        </div>
+        <div class="form-group">
+          <i class="fas fa-code"></i>
+          <label for="school-code" data-i18n="labelSchoolCode">School Code (e.g., SJH)</label>
+          <input type="text" id="school-code" class="input" placeholder="e.g., SJH" maxlength="10">
+        </div>
+        <div class="form-group">
+          <i class="fas fa-calendar"></i>
+          <label for="academic-year" data-i18n="AcademicYear">Academic Year (e.g., 2025 or 2024/2025)</label>
+          <input type="text" id="academic-year" class="input" placeholder="e.g., 2025 or 2024/2025" maxlength="20">
+        </div>
+        <div class="form-buttons">
+          <button type="submit" class="btn btn-primary" id="save-school-btn" data-i18n="saveSchoolBtn">
+            <i class="fas fa-save"></i>Save School Name
+          </button>
+          <button type="button" class="btn btn-secondary" id="regenerate-matricules-btn" title="Rebuild matricules for all students using the saved School Code and Academic Year" data-i18n="regenerateMatriculesBtn">
+            <i class="fas fa-sync"></i> Regenerate Matricules
+          </button>
+        </div>
+      </form>
+    </div>
+    <div class="license-panel">
+      <h2 data-i18n="licenseSectionTitle"><i class="fas fa-key"></i> License</h2>
+      <div class="license-status">
+        <p><strong data-i18n="licenseStatusLabel">Status:</strong> <span id="license-status-text">Checking...</span></p>
+        <p><strong data-i18n="licenseExpiresLabel">Expires At:</strong> <span id="license-expires-text">-</span></p>
+      </div>
+      <div class="form-group">
+        <label for="license-key" data-i18n="licenseKeyLabel">License Key</label>
+        <textarea id="license-key" class="input license-input" rows="3" placeholder="Paste license key here" data-i18n="licenseKeyPlaceholder"></textarea>
+      </div>
+      <div class="form-buttons">
+        <button type="button" class="btn btn-primary" id="activate-license-btn">
+          <i class="fas fa-check"></i> <span data-i18n="activateLicenseBtn">Activate License</span>
+        </button>
+        <button type="button" class="btn btn-danger" id="deactivate-license-btn">
+          <i class="fas fa-ban"></i> <span data-i18n="deactivateLicenseBtn">Deactivate</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="stats-container">
+      <div class="stat-card">
+        <i class="fas fa-users fa-2x" style="color: var(--primary);"></i>
+        <div class="stat-number" id="total-students">0</div>
+        <div class="stat-label" data-i18n="totalStudents">Total Students</div>
+      </div>
+      <div class="stat-card">
+        <i class="fas fa-check-circle fa-2x" style="color: var(--success);"></i>
+        <div class="stat-number" id="completed-fees">0</div>
+        <div class="stat-label" data-i18n="completedFees">Fees Completed</div>
+      </div>
+      <div class="stat-card">
+        <i class="fas fa-exclamation-triangle fa-2x" style="color: var(--warning);"></i>
+        <div class="stat-number" id="owing-fees">0</div>
+        <div class="stat-label" data-i18n="owingFees">Fees Owing</div>
+      </div>
+      <div class="stat-card">
+        <i class="fas fa-book fa-2x" style="color: var(--accent);"></i>
+        <div class="stat-number">10</div>
+        <div class="stat-label" data-i18n="classes">Classes</div>
+      </div>
+    </div>
+    
+    <div class="search-container">
+      <div class="search-input-group">
+        <input type="text" id="search-input" class="input" placeholder="Search by name, class, or matricule...">
+      </div>
+      <div class="search-input-group">
+        <select id="search-class" class="input">
+          <option value="" data-i18n="allClasses">All Classes</option>
+          <option value="form1" data-i18n="form1">Form 1</option>
+          <option value="form2" data-i18n="form2">Form 2</option>
+          <option value="form3" data-i18n="form3">Form 3</option>
+          <option value="form4" data-i18n="form4">Form 4</option>
+          <option value="form5" data-i18n="form5">Form 5</option>
+          <option value="lower-sixth" data-i18n="lowerSixth">Lower Sixth</option>
+          <option value="upper-sixth" data-i18n="upperSixth">Upper Sixth</option>
+        </select>
+      </div>
+      <div class="search-input-group">
+        <select id="search-department" class="input">
+          <option value="">All Departments</option>
+          <option value="arts" data-i18n="arts">Arts</option>
+          <option value="science" data-i18n="science">Science</option>
+        </select>
+      </div>
+      <div class="search-input-group">
+        <select id="search-series" class="input">
+          <option value="">All Series</option>
+          <option value="A1">A1</option>
+          <option value="A2">A2</option>
+          <option value="S1">S1</option>
+          <option value="S2">S2</option>
+        </select>
+      </div>
+      <div class="search-input-group">
+        <select id="search-gender" class="input">
+          <option value="" data-i18n="allGenders">All Genders</option>
+          <option value="male" data-i18n="male">Male</option>
+          <option value="female" data-i18n="female">Female</option>
+        </select>
+      </div>
+      <div class="search-input-group">
+        <input type="number" id="search-age" class="input" placeholder="Age..." data-i18n="age">
+      </div>
+      <div class="search-input-group">
+        <select id="search-fee-status" class="input">
+          <option value="" data-i18n="allFeeStatus">All Fee Status</option>
+          <option value="completed" data-i18n="completed">Completed</option>
+          <option value="owing" data-i18n="owing">Owing</option>
+        </select>
+      </div>
+      <div class="search-input-group">
+        <select id="search-status" class="input" title="Filter by status">
+          <option value="active" data-i18n="statusActive">Active</option>
+          <option value="inactive" data-i18n="statusInactive">Inactive</option>
+          <option value="all" data-i18n="statusAll">All</option>
+        </select>
+      </div>
+      <div class="search-buttons">
+        <button class="btn btn-primary" id="search-btn">
+          <i class="fas fa-search"></i> <span data-i18n="btnSearch">Search</span>
+        </button>
+        <button class="btn btn-success" id="print-all-btn">
+          <i class="fas fa-print"></i> <span data-i18n="btnPrintAll">Print All</span>
+        </button>
+        <button class="btn btn-secondary" id="reset-search-btn">
+          <i class="fas fa-redo"></i> <span data-i18n="btnReset">Reset</span>
+        </button>
+        <div class="search-input-group" style="min-width: 220px;">
+          <select id="sort-by" aria-label="Sort students" class="input">
+            <option value="nameAsc" data-i18n="nameAsc">Name A → Z</option>
+            <option value="nameDesc" data-i18n="nameDesc">Name Z → A</option>
+            <option value="idAsc" data-i18n="idAsc">ID ↑ (1 → N)</option>
+            <option value="idDesc" data-i18n="idDesc">ID ↓ (N → 1)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="sort-btn">
+          <i class="fas fa-sort"></i> <span data-i18n="btnSort">Sort</span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="app-grid" id="appGrid">
+      <div class="form-section">
+        <h2 class="section-title" data-i18n="registerNewStudent"><i class="fas fa-user-plus"></i> Register New Student</h2>
+        
+        <form id="student-form" enctype="multipart/form-data">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="firstName" data-i18n="firstName">First Name *</label>
+              <input type="text" id="firstName" class="input" placeholder="Enter first name" name="firstName" required>
+            </div>
+            <div class="form-group">
+              <label for="lastName" data-i18n="lastName">Last Name *</label>
+              <input type="text" id="lastName" class="input" placeholder="Enter last name" name="lastName" required>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="dob" data-i18n="dob">Date of Birth *</label>
+              <input type="date" id="dob" class="input" name="dob" required>
+            </div>
+            <div class="form-group">
+              <label for="gender" data-i18n="gender">Gender *</label>
+              <div class="gender-option">
+                <label>
+                  <input type="radio" name="gender" value="male" required>
+                  <span data-i18n="male">Male</span>
+                </label>
+                <label>
+                  <input type="radio" name="gender" value="female" required>
+                  <span data-i18n="female">Female</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="class" data-i18n="class">Class</label>
+            <select id="class" name="classLevel" class="input" required>
+              <option value="" data-i18n="selectClass">Select Class</option>
+              <option value="form1">Form 1(<span class="fees-info" data-class="form1"></span>)</option>
+              <option value="form2">Form 2(<span class="fees-info" data-class="form2"></span>)</option>
+              <option value="form3">Form 3(<span class="fees-info" data-class="form3"></span>)</option>
+              <option value="form4">Form 4(<span class="fees-info" data-class="form4"></span>)</option>
+              <option value="form5">Form 5(<span class="fees-info" data-class="form5"></span>)</option>
+              <option value="lower-sixth">Lower Sixth(<span class="fees-info" data-class="lower-sixth"></span>)</option>
+              <option value="upper-sixth">Upper Sixth(<span class="fees-info" data-class="upper-sixth"></span>)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group" id="dept-group" style="display:none;">
+              <label for="department" data-i18n="department">Department</label>
+             <select id="department" name="department" class="input">
+                <option value="" selected>-</option>
+                <option value="arts" data-i18n="arts">Arts</option>
+                <option value="science" data-i18n="science">Science</option>
+              </select>
+            </div>
+           <div class="form-group" id="series-group" style="display:none;">
+              <label for="series" data-i18n="series">Series</label>
+              <select id="series" name="series" class="input">
+                <option value="">Select Series</option>
+                <!-- Arts series -->
+                <option value="A1" class="arts-series">A1 - Literature & Languages</option>
+                <option value="A2" class="arts-series">A2 - History & Geography</option>
+                <option value="A3" class="arts-series">A3 - Economics & Sociology</option>
+                <option value="A4" class="arts-series">A4 - Arts & Philosophy</option>
+                <!-- Science series -->
+                <option value="S1" class="science-series">S1 - Mathematics & Physics</option>
+                <option value="S2" class="science-series">S2 - Biology & Geology</option>
+                <option value="S3" class="science-series">S3 - Technology & Engineering</option>
+                <option value="S4" class="science-series">S4 - Computer Science</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="fees-paid" data-i18n="feesPaid">School Fees Paid (FRS) *</label>
+            <input type="number" id="fees-paid" class="input" name="feesPaid" placeholder="Enter amount paid" required>
+          </div>
+
+          <div class="form-group">
+            <label for="phone" data-i18n="phone">Guardian Number *</label>
+            <input type="text" id="phone" class="input" name="phone" placeholder="Enter phone number" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="profile-pic" data-i18n="profilePic">Profile Picture</label>
+            <input type="file" id="profile-pic" name="profilePic" accept="image/*">
+          </div>
+
+          <div class="form-group">
+            <input type="hidden" id="existingPic" name="existingPic" value="">
+          </div>
+
+          <div class="form-group">
+            <img id="profilePicPreview" src="" alt="Profile Preview" style="max-width: 150px; display: none; margin-bottom: 10px;" />
+          </div>
+          
+          <div class="form-buttons">
+            <button type="submit" class="btn btn-primary" id="subbut">
+              <i class="fas fa-user-plus"></i> <span data-i18n="btnAddStudent">Add Student</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="clear-btn">
+              <i class="fas fa-undo"></i> <span data-i18n="btnClearForm">Clear Form</span>
+            </button>
+          </div>
+        </form>
+      </div>
+      <!-- Student cards will be rendered here by JS -->
+    </div>
+    
+    <div class="class-fees-section">
+      <form id="class-fees-form">
+        <h3><i class="fas fa-money-bill"></i> <span data-i18n="setClassFees">Set Class Fees</span></h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="fee-form1">Form 1</label>
+            <input type="number" id="fee-form1" name="form1" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="fee-form2">Form 2</label>
+            <input type="number" id="fee-form2" name="form2" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="fee-form3">Form 3</label>
+            <input type="number" id="fee-form3" name="form3" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="fee-form4">Form 4</label>
+            <input type="number" id="fee-form4" name="form4" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="fee-form5">Form 5</label>
+            <input type="number" id="fee-form5" name="form5" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="fee-lower-sixth">Lower Sixth</label>
+            <input type="number" id="fee-lower-sixth" name="lower-sixth" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="fee-upper-sixth">Upper Sixth</label>
+            <input type="number" id="fee-upper-sixth" name="upper-sixth" min="0" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> <span data-i18n="btnSaveFees">Save Fees</span></button>
+      </form>
+    </div>
+    
+    <footer>
+      <p data-i18n="footerText">Student Registration System &copy;2025 All rights reserved | Developed for Educational Institutions, by Meriki Jubert</p>
+    </footer>
+  </div>
+  
+  <!-- Hidden section for printing -->
+  <div id="print-section"></div>
+  <div class="notification" id="notification"></div>
+
+  <!-- Global loader overlay -->
+  <div id="loader" class="loader-overlay hidden">
+    <div class="spinner"></div>
+    <div id="loader-text" data-i18n="loading">Loading...</div>
+  </div>
+  
+  <!-- Scroll to top button -->
+  <button id="scroll-to-top" class="scroll-to-top-btn" title="Go to top">
+    <i class="fas fa-arrow-up"></i>
+  </button>
+  
+  <script src="script.js"></script>
+</body>
+</html>
