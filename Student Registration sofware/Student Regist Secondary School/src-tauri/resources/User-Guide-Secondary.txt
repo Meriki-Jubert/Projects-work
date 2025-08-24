@@ -1,0 +1,209 @@
+BlueLedger Student Registration - Secondary School
+User Guide (v1)
+
+Overview
+- Purpose: Manage secondary students from registration to fees, records, search/print, and licensing.
+- Audience: Clerks, bursars, and administrators.
+
+Key Concepts
+- Active vs Inactive:
+  - Active: Normal students included in counts, search results (default), and operations.
+  - Inactive: Students you intentionally mark as inactive (withdrawn/transferred/expired). They are hidden by default, excluded from stats, and only allow Reactivate or Delete. The system records when a student was marked inactive (inactiveAt).
+- Matricule: Auto-generated unique code for each student using school code + academic year + sequential ID.
+- License: Controls access. If missing/expired, protected features are limited and an expiry process will mark students inactive.
+
+Daily Tasks
+1) Add a Student
+- Go to the registration form at the top of the page.
+- Required fields: First Name, Last Name, DOB, Gender, Class Level, Department/Series (if applicable).
+- Optional: Phone, Profile picture (uploads stored internally), Fees Paid.
+- Click "Add Student". The list updates immediately. A matricule is assigned automatically.
+
+2) Edit a Student
+- In the students list, click "Edit" on the student card.
+- The form is populated; make changes and click "Save".
+- Note: You cannot edit students while they are Inactive. Reactivate first if you must update their record.
+
+3) Delete a Student
+- On the student card, click "Delete".
+- Confirm the action. This permanently removes the record (and deletes the uploaded profile image if present).
+
+4) Mark Inactive / Reactivate
+- Mark Inactive: Hides the student from default views, excludes them from stats, and timestamps inactiveAt.
+- Reactivate: Returns the student to the Active pool. Use filters to locate inactive students (Status = Inactive) when needed.
+
+5) Search and Filter
+- Quick search: Enter a name, matricule, or ID in the search box, then click "Search".
+- Filters (toolbar at top of the list):
+  - Class/Level
+  - Gender
+  - Age (computed from DOB)
+  - Fee status (Completed/Owing)
+  - Status (Active/Inactive/All)
+- Sort: By Name A→Z / Z→A, or by ID ascending/descending.
+- Pagination: The system loads up to 100 students per page (server cap). Use navigation controls to move between pages.
+
+6) Fees and School Settings
+- Set Class Fees: Open the fees section, enter each class’s fee amount, and click "Save Fees".
+- School Info: Set school name, short code, and academic year, then click "Save School Name".
+  - The code and year are used in automatic matricule generation for new students.
+
+7) Printing and Reports
+- Print a single student: Click the "Print" button on a student card to print that student’s details/receipt. Use your printer dialog to print or “Save as PDF”.
+- Print all: Click "Print All" to print the current result set (honors your filters and search). Use your printer dialog to paper-print or save a PDF report.
+- Printing styles are optimized for readability; non-essential UI is excluded on paper.
+
+8) Saving Receipts/Reports
+- Use the browser print dialog to choose “Save as PDF” for a digital copy.
+- Filenames and storage location are chosen in your print dialog.
+
+License Management
+- View status in the License panel (Status, Expires).
+- Activate: Paste a valid license key and click "Activate License". Protected features unlock when active.
+- Deactivate: Click "Deactivate License" to remove the active key (for transfers or troubleshooting).
+- Expiry behavior: When the license reaches its expiration date, the system automatically marks all Active students as Inactive once and records the timestamp.
+
+Automatic Purge (Inactive Cleanup)
+- Purpose: Keep the database tidy by removing long-inactive records.
+- Schedule: Runs daily around 02:00.
+- Two-stage process (based on code in Backend/server.js):
+  1) Initial purge (first time only): 3 months after license activation, all students who are Inactive are permanently deleted. Their profile images are removed from storage.
+  2) Rolling purge: After the initial purge has occurred, any student who has been Inactive for at least 14 days is permanently deleted.
+- Manual purge (Admin): An administrator can trigger the purge process immediately via the admin endpoint. Contact your IT admin if needed.
+- Important: Deleted means permanently removed and cannot be recovered from the app. Make periodic backups (see Data & Backups).
+
+What “Marking Inactive” Means
+- Operationally: The student is hidden from default views, excluded from summary statistics, and only Reactivate/Delete actions are available.
+- Retention policy: Inactive students are candidates for automatic deletion according to the purge rules above.
+
+Data & Backups
+- Database: Registration data lives in a SQLite file named Registration.db.
+- Typical locations:
+  - During development: In the application’s Backend directory.
+  - Installed (Windows Service packaging): C:\ProgramData\BlueLedger\Registration.db
+- Backups: Periodically copy Registration.db (and the uploads folder if you need profile pictures) to a safe location while the service/app is not actively writing.
+
+Troubleshooting Tips (User-facing)
+- Nothing shows after Search: Check Status filter (Active vs All), clear the search box, and press Reset.
+- Can’t Edit/Print a student: Verify the student is Active.
+- Fees counts look wrong: Ensure class fees are saved and students’ Fees Paid are updated.
+- License warnings: Open License panel to activate or renew. Some features are limited if the license is missing/expired.
+
+Glossary (Secondary specifics)
+- Class Levels: Form 1–5, Lower Sixth, Upper Sixth.
+- Departments/Series: Optional metadata for secondary tracks.
+- Page Size: Up to 100 results per page by design.
+
+Security & Privacy
+- Only authorized staff should access the app.
+- Do not share license keys publicly.
+- Treat exported PDFs and printed reports as confidential student records.
+
+Version Notes
+- Backend port (packaged): The Secondary backend typically runs as a service with its own port; end users access the app via the desktop interface.
+
+================================
+Version Française (Secondaire)
+================================
+
+Aperçu
+- Objectif : Gérer les élèves du secondaire, de l’inscription au suivi des frais, en passant par la recherche, l’impression et la gestion de la licence.
+- Public : Secrétaires, comptables et administrateurs.
+
+Concepts clés
+- Actif vs Inactif :
+  - Actif : Élèves inclus par défaut dans les résultats, les statistiques et les opérations.
+  - Inactif : Élèves marqués volontairement (retrait/transfert/expiration). Masqués par défaut, exclus des statistiques, seules les actions Réactiver ou Supprimer sont disponibles. Le système enregistre la date de passage à l’état inactif (inactiveAt).
+- Matricule : Code unique généré automatiquement à partir du code de l’école + de l’année académique + d’un identifiant séquentiel.
+- Licence : Contrôle l’accès. Si elle est manquante/expirée, certaines fonctionnalités sont limitées et une procédure d’expiration peut marquer les élèves comme inactifs.
+
+Tâches quotidiennes
+1) Ajouter un élève
+- Remplissez le formulaire d’inscription en haut de la page.
+- Obligatoire : Nom, Prénom, Date de naissance, Sexe, Niveau/Classe, Département/Série (si applicable).
+- Facultatif : Téléphone, Photo de profil (téléversée), Frais payés.
+- Cliquez sur « Ajouter un élève ». La liste se met à jour et un matricule unique est attribué automatiquement.
+
+2) Modifier un élève
+- Dans la liste, cliquez sur « Modifier » sur la carte de l’élève.
+- Le formulaire se remplit ; effectuez les changements puis cliquez sur « Enregistrer ».
+- Remarque : Vous ne pouvez pas modifier un élève inactif. Réactivez-le d’abord si nécessaire.
+
+3) Supprimer un élève
+- Sur la carte, cliquez sur « Supprimer ».
+- Confirmez l’action. La fiche est supprimée définitivement (la photo de profil téléversée est également supprimée si elle existe).
+
+4) Marquer Inactif / Réactiver
+- Marquer inactif : Masque l’élève des vues par défaut, l’exclut des statistiques et enregistre inactiveAt.
+- Réactiver : Restaure l’élève dans le groupe Actif. Utilisez le filtre Statut = Inactif pour le retrouver.
+
+5) Recherche et filtres
+- Recherche rapide : Saisissez un nom, un matricule ou un ID puis cliquez sur « Rechercher ».
+- Filtres (barre au-dessus de la liste) :
+  - Classe/Niveau
+  - Sexe
+  - Âge (calculé à partir de la date de naissance)
+  - Statut de frais (Terminé/En cours)
+  - Statut (Actif/Inactif/Tous)
+- Tri : Nom A→Z / Z→A, ou ID croissant/décroissant.
+- Pagination : Jusqu’à 100 élèves par page (limite serveur). Naviguez entre les pages via les contrôles.
+
+6) Frais et informations de l’école
+- Définir les frais par classe : Ouvrez la section des frais, saisissez le montant pour chaque classe, puis « Enregistrer les frais ».
+- Informations de l’école : Saisissez le nom, le code court et l’année académique, puis « Enregistrer ». 
+  - Le code et l’année servent à générer automatiquement les matricules.
+
+7) Impression et rapports
+- Imprimer un élève : Cliquez sur « Imprimer » sur la carte pour imprimer les détails/le reçu. Utilisez la boîte de dialogue d’impression pour imprimer ou « Enregistrer au format PDF ».
+- Tout imprimer : Cliquez sur « Tout imprimer » pour imprimer l’ensemble des résultats (respecte vos filtres et recherches). Utilisez la boîte de dialogue d’impression pour imprimer sur papier ou enregistrer un PDF.
+- La mise en page d’impression privilégie la lisibilité ; les éléments d’interface non essentiels sont masqués.
+
+8) Enregistrement des reçus/rapports
+- Utilisez la boîte de dialogue d’impression et choisissez « Enregistrer au format PDF » pour une copie numérique.
+- Vous choisissez le nom du fichier et l’emplacement de sauvegarde.
+
+Gestion de la licence
+- Consultez l’état dans le panneau Licence (Statut, Expiration).
+- Activer : Collez une clé valide puis « Activer la licence ». Les fonctionnalités protégées sont alors disponibles.
+- Désactiver : « Désactiver la licence » pour retirer la clé (transfert ou dépannage).
+- Comportement à l’expiration : À la date d’expiration, le système marque automatiquement tous les élèves actifs comme inactifs une seule fois et enregistre l’horodatage.
+
+Purge automatique (nettoyage des inactifs)
+- Objectif : Maintenir la base propre en supprimant les fiches inactives depuis longtemps.
+- Planification : Exécution quotidienne vers 02h00.
+- Processus en deux étapes :
+  1) Purge initiale (une seule fois) : 3 mois après l’activation de la licence, tous les élèves inactifs sont supprimés définitivement. Les images de profil correspondantes sont également supprimées.
+  2) Purge continue : Après la purge initiale, tout élève inactif depuis au moins 14 jours est supprimé définitivement.
+- Purge manuelle (Admin) : Un administrateur peut déclencher la purge immédiatement via l’endpoint d’administration.
+- Important : Supprimé = définitivement effacé et non récupérable depuis l’application. Effectuez des sauvegardes régulières (voir Données & sauvegardes).
+
+Ce que signifie « Marquer inactif »
+- Opérationnellement : L’élève est masqué des vues par défaut, exclu des statistiques, et seules les actions Réactiver/Supprimer sont disponibles.
+- Politique de conservation : Les élèves inactifs sont susceptibles d’être supprimés automatiquement selon les règles ci-dessus.
+
+Données & sauvegardes
+- Base de données : Les données sont stockées dans un fichier SQLite nommé Registration.db.
+- Emplacements typiques :
+  - En développement : Dans le dossier Backend de l’application.
+  - Installé (Service Windows) : C:\ProgramData\BlueLedger\Registration.db
+- Sauvegardes : Copiez périodiquement Registration.db (et le dossier uploads pour les photos) vers un emplacement sûr lorsque le service/l’application n’écrit pas.
+
+Dépannage (côté utilisateur)
+- Aucun résultat après une recherche : Vérifiez le filtre Statut (Actif vs Tous), videz le champ de recherche et cliquez sur Réinitialiser.
+- Impossible de Modifier/Imprimer : Vérifiez que l’élève est Actif.
+- Les compteurs de frais semblent erronés : Assurez-vous que les frais par classe sont enregistrés et que les paiements des élèves sont à jour.
+
+Glossaire (spécifique secondaire)
+- Niveaux : Form 1–5, Lower Sixth, Upper Sixth.
+- Départements/Séries : Métadonnées optionnelles pour les filières.
+- Taille de page : Jusqu’à 100 résultats par page.
+
+Sécurité & confidentialité
+- L’accès est réservé au personnel autorisé.
+- Ne partagez pas les clés de licence.
+- Traitez les PDF et impressions comme des dossiers confidentiels.
+
+Notes de version
+- Port backend (package) : Le backend secondaire s’exécute généralement comme un service avec son propre port ; les utilisateurs accèdent à l’application via l’interface de bureau.
+
+Fin du guide utilisateur
