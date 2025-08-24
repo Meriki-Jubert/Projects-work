@@ -228,9 +228,12 @@ const i18n = {
     department: 'Department',
     arts: 'Arts',
     science: 'Science',
+    comercial: 'Commercial',
+    general: 'General',
     series: 'Series',
     allDepartments: 'All Departments',
     allSeries: 'All Series',
+    notifStudentsFound: 'Found {count} student(s)',
   },
   fr: {
     appTitle: 'Inscription des Élèves',
@@ -359,6 +362,8 @@ const i18n = {
     department: 'Département',
     arts: 'Arts',
     science: 'Sciences',
+    comercial: 'Commercial',
+    general: 'Général',
     series: 'Série',
     allDepartments: 'Tous les départements',
     allSeries: 'Toutes les séries',
@@ -508,8 +513,9 @@ window.addEventListener('beforeprint', () => {
 // DOM References
 
 const studentForm = document.getElementById('student-form');
-const studentContainer = document.getElementById('studentContainer');
-const notification = document.getElementById('notification');
+const profilePicInput = document.getElementById('profile-pic');
+const preview = document.getElementById('profilePicPreview');
+const head = document.getElementById('school-logo');
 const loader = document.getElementById('loader');
 const loaderText = document.getElementById('loader-text');
 
@@ -522,6 +528,8 @@ const searchBtn = document.getElementById('search-btn');
 const resetSearchBtn = document.getElementById('reset-search-btn');
 const printAllBtn = document.getElementById('print-all-btn');
 const sortBySelect = document.getElementById('sort-by');
+const searchDepartment = document.getElementById('search-department');
+const searchSeries = document.getElementById('search-series');
 const sortBtn = document.getElementById('sort-btn');
 const searchStatus = document.getElementById('search-status');
 
@@ -534,8 +542,44 @@ const seriesSelect = document.getElementById('series');
 function updateDeptSeriesVisibility() {
   const val = classSelect ? classSelect.value : '';
   const isSixth = val === 'lower-sixth' || val === 'upper-sixth';
-  const isDept = isSixth || val === 'form4' || val === 'form5';
-  const isSeries = isSixth; // only for lower/upper sixth
+  const isDept = val === 'form3' || val === 'form4' || val === 'form5' || isSixth;
+
+  // Determine which department options should be available based on class
+  if (departmentSelect) {
+    const opts = Array.from(departmentSelect.options);
+    // Map for quick access
+    const byValue = Object.fromEntries(opts.map(o => [o.value, o]));
+    const showOnly = (allowed) => {
+      opts.forEach((opt, idx) => {
+        if (idx === 0) { // placeholder
+          opt.disabled = false; opt.hidden = false; opt.style.display = '';
+          return;
+        }
+        const visible = allowed.includes(opt.value);
+        opt.disabled = !visible;
+        opt.hidden = !visible;
+        opt.style.display = visible ? '' : 'none';
+      });
+      // Reset selection if now invalid
+      if (departmentSelect.value && (!byValue[departmentSelect.value] || byValue[departmentSelect.value].disabled)) {
+        departmentSelect.value = '';
+      }
+    };
+
+    if (val === 'form3' || val === 'form4') {
+      // Only Commercial and General for Forms 3-4
+      showOnly(['comercial', 'general']);
+    } else if (val === 'form5' || isSixth) {
+      // Arts, Science, and Commercial for Form 5 and Sixth
+      showOnly(['arts', 'science', 'comercial']);
+    } else {
+      // Other classes: hide all department choices
+      showOnly([]);
+    }
+  }
+
+  // Series visible for sixth forms regardless of department selection
+  const isSeries = isSixth;
 
   if (deptGroup) deptGroup.style.display = isDept ? '' : 'none';
   if (seriesGroup) seriesGroup.style.display = isSeries ? '' : 'none';
@@ -543,8 +587,8 @@ function updateDeptSeriesVisibility() {
   // Clear fields when hidden
   if (!isDept && departmentSelect) departmentSelect.value = '';
   if (!isSeries && seriesSelect) seriesSelect.value = '';
-  
-  // When series is visible, ensure options reflect chosen department
+
+  // Ensure series options reflect chosen department when series is visible
   if (isSeries) updateSeriesOptions();
 }
 
@@ -553,6 +597,7 @@ function updateSeriesOptions() {
   const dept = (departmentSelect && departmentSelect.value) || '';
   const isArts = dept === 'arts';
   const isScience = dept === 'science';
+  const isCommercial = dept === 'comercial';
   // Iterate options and toggle visibility based on class on the option
   Array.from(seriesSelect.options).forEach((opt, idx) => {
     // Always keep the first placeholder option visible
@@ -564,9 +609,11 @@ function updateSeriesOptions() {
     }
     const isArtsSeries = opt.classList.contains('arts-series');
     const isScienceSeries = opt.classList.contains('science-series');
-    let visible = true;
+    const isCommercialSeries = opt.classList.contains('commercial-series');
+    let visible = false;
     if (isArts) visible = isArtsSeries;
     else if (isScience) visible = isScienceSeries;
+    else if (isCommercial) visible = isCommercialSeries;
     // Show/hide
     opt.disabled = !visible;
     opt.hidden = !visible;
@@ -673,8 +720,6 @@ function updatePaginationUI() {
   if (nextPageBtn) nextPageBtn.disabled = currentPage >= totalPages;
 }
 
-// Pagination state declared at top of file
-
 async function fetchStudents() {
   showLoader(t('loading'));
   try {
@@ -683,12 +728,14 @@ async function fetchStudents() {
     params.set('page', String(currentPage));
     params.set('pageSize', String(pageSize));
 
+    // status/includeInactive
     if (statusSel === 'all') {
       params.set('includeInactive', 'true');
     } else {
-      params.set('status', statusSel);
+      params.set('status', statusSel); // 'active' or 'inactive'
     }
 
+    // Filters from UI
     const hasQ = !!(searchInput && searchInput.value.trim());
     const hasClass = !!(searchClass && searchClass.value);
     const hasGender = !!(searchGender && searchGender.value);
@@ -708,7 +755,7 @@ async function fetchStudents() {
     totalCount = Array.isArray(payload) ? rows.length : (payload.total || rows.length || 0);
 
     students = rows;
-    filteredStudents = rows;
+    filteredStudents = rows; // already filtered server-side
     renderStudents(filteredStudents);
     updateStats(filteredStudents);
     updatePaginationUI();
@@ -982,7 +1029,12 @@ studentForm.addEventListener('submit', async (e) => {
     formData.append('classLevel', classLevel);
     formData.append('feesPaid', feesPaid);
     formData.append('phone', phone);
-
+    // Also include Department and Series if available
+    const deptVal = (typeof departmentSelect !== 'undefined' && departmentSelect) ? (departmentSelect.value || '') : '';
+    const seriesVal = (typeof seriesSelect !== 'undefined' && seriesSelect) ? (seriesSelect.value || '') : '';
+    formData.append('department', deptVal);
+    formData.append('series', seriesVal);
+    
     let response;
     if (id) {
       // Update existing student
@@ -1239,6 +1291,25 @@ resetSearchBtn.addEventListener('click', () => {
   fetchStudents();
 });
 
+// Pagination buttons
+if (prevPageBtn) {
+  prevPageBtn.addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      fetchStudents();
+    }
+  });
+}
+if (nextPageBtn) {
+  nextPageBtn.addEventListener('click', () => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (currentPage < totalPages) {
+      currentPage++;
+      fetchStudents();
+    }
+  });
+}
+
 // Print All Students (table layout, includes First/Last Name, Class, Dept, Fees owed)
 
 printAllBtn.addEventListener('click', () => {
@@ -1360,7 +1431,6 @@ const schoolLogoInput = document.getElementById('logo');
 const schoolCodeInput = document.getElementById('school-code');
 const academicYearInput = document.getElementById('academic-year');
 const regenerateBtn = document.getElementById('regenerate-matricules-btn');
-const head = document.getElementById('school-logo');
 
 schoolForm.addEventListener('submit', async (e) => {
   e.preventDefault();

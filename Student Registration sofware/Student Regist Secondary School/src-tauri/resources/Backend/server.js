@@ -136,43 +136,82 @@ const db = new sqlite3.Database(dbPath, (err) => {
         db.run('ALTER TABLE students ADD COLUMN series TEXT', () => next());
       };
 
-      // Ensure school.code and school.academicYear
-      db.all('PRAGMA table_info(school)', (err2, cols2) => {
-        if (err2) return addMatricule(() => cb());
-        const hasCode = cols2.some(c => c.name.toLowerCase() === 'code');
-        const hasYear = cols2.some(c => c.name.toLowerCase() === 'academicyear');
-        const addCode = (next) => {
-          if (hasCode) return next();
-          db.run('ALTER TABLE school ADD COLUMN code TEXT', () => next());
+      // Ensure helpful indexes exist (idempotent)
+      const addIndexes = (next) => {
+        const stmts = [
+          "CREATE INDEX IF NOT EXISTS idx_students_status ON students(status)",
+          "CREATE INDEX IF NOT EXISTS idx_students_classLevel ON students(classLevel)",
+          "CREATE INDEX IF NOT EXISTS idx_students_department ON students(department)",
+          "CREATE INDEX IF NOT EXISTS idx_students_series ON students(series)",
+          "CREATE INDEX IF NOT EXISTS idx_students_lastName ON students(lastName)",
+          "CREATE INDEX IF NOT EXISTS idx_students_firstName ON students(firstName)",
+          `CREATE INDEX IF NOT EXISTS idx_students_${MATRICULE_COL}_nocase ON students(${MATRICULE_COL})`,
+          "CREATE INDEX IF NOT EXISTS idx_students_inactiveAt ON students(inactiveAt)",
+        ];
+        let i = 0;
+        const runNext = () => {
+          if (i >= stmts.length) return next();
+          db.run(stmts[i], () => { i++; runNext(); });
         };
-        const addYear = (next) => {
-          if (hasYear) return next();
-          db.run('ALTER TABLE school ADD COLUMN academicYear TEXT', () => next());
-        };
+        runNext();
+      };
 
-        // Ensure license.activatedAt column exists
-        db.all('PRAGMA table_info(license)', (err3, cols3) => {
-          const hasActivatedAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'activatedat');
-          const addActivatedAt = (next) => {
-            if (hasActivatedAt) return next();
-            db.run('ALTER TABLE license ADD COLUMN activatedAt TEXT', () => next());
-          };
+      // Chain column additions then indexes, then proceed to school/license columns
+      addMatricule(() => {
+        addPhone(() => {
+          addStatus(() => {
+            addInactiveAt(() => {
+              addDepartment(() => {
+                addSeries(() => {
+                  addIndexes(() => {
+                    // Ensure school.code and school.academicYear
+                    db.all('PRAGMA table_info(school)', (err2, cols2) => {
+                      if (err2) return cb(err2);
+                      const hasCode = cols2.some(c => c.name.toLowerCase() === 'code');
+                      const hasYear = cols2.some(c => c.name.toLowerCase() === 'academicyear');
+                      const addCode = (next) => {
+                        if (hasCode) return next();
+                        db.run('ALTER TABLE school ADD COLUMN code TEXT', () => next());
+                      };
+                      const addYear = (next) => {
+                        if (hasYear) return next();
+                        db.run('ALTER TABLE school ADD COLUMN academicYear TEXT', () => next());
+                      };
 
-          // Ensure license.initialPurgeAt column exists
-          const hasInitialPurgeAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'initialpurgeat');
-          const addInitialPurgeAt = (next) => {
-            if (hasInitialPurgeAt) return next();
-            db.run('ALTER TABLE license ADD COLUMN initialPurgeAt TEXT', () => next());
-          };
+                      // Ensure license columns
+                      db.all('PRAGMA table_info(license)', (err3, cols3) => {
+                        const hasActivatedAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'activatedat');
+                        const addActivatedAt = (next) => {
+                          if (hasActivatedAt) return next();
+                          db.run('ALTER TABLE license ADD COLUMN activatedAt TEXT', () => next());
+                        };
+                        const hasInitialPurgeAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'initialpurgeat');
+                        const addInitialPurgeAt = (next) => {
+                          if (hasInitialPurgeAt) return next();
+                          db.run('ALTER TABLE license ADD COLUMN initialPurgeAt TEXT', () => next());
+                        };
+                        const hasExpiredAppliedAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'expiredappliedat');
+                        const addExpiredAppliedAt = (next) => {
+                          if (hasExpiredAppliedAt) return next();
+                          db.run('ALTER TABLE license ADD COLUMN expiredAppliedAt TEXT', () => next());
+                        };
 
-          // Ensure license.expiredAppliedAt column exists
-          const hasExpiredAppliedAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'expiredappliedat');
-          const addExpiredAppliedAt = (next) => {
-            if (hasExpiredAppliedAt) return next();
-            db.run('ALTER TABLE license ADD COLUMN expiredAppliedAt TEXT', () => next());
-          };
-
-          addMatricule(() => addPhone(() => addStatus(() => addInactiveAt(() => addDepartment(() => addSeries(() => addCode(() => addYear(() => addActivatedAt(() => addInitialPurgeAt(() => addExpiredAppliedAt(() => cb())))))))))));
+                        addCode(() => {
+                          addYear(() => {
+                            addActivatedAt(() => {
+                              addInitialPurgeAt(() => {
+                                addExpiredAppliedAt(() => cb());
+                              });
+                            });
+                          });
+                        });
+                      });
+                    });
+                  });
+                });
+              });
+            });
+          });
         });
       });
     });
@@ -472,14 +511,70 @@ const db = new sqlite3.Database(dbPath, (err) => {
   // Apply license middleware to protected APIs
   app.use('/api', (req, res, next) => checkLicense(req, res, next));
 
-  // GET all students
-  app.get('/api/students', (req, res) => {
-    const includeInactive = (req.query && (req.query.includeInactive === 'true' || req.query.includeInactive === true));
-    const sql = includeInactive ? 'SELECT * FROM students ORDER BY id DESC' : "SELECT * FROM students WHERE COALESCE(status,'active') = 'active' ORDER BY id DESC";
-    db.all(sql, (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(rows);
-    });
+  // GET students (paginated + filters)
+  app.get('/api/students', async (req, res) => {
+    try {
+      // Pagination
+      const page = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);
+      const pageSizeRaw = Math.max(parseInt(req.query.pageSize || '20', 10) || 20, 1);
+      const pageSize = Math.min(pageSizeRaw, 100); // cap page size
+      const offset = (page - 1) * pageSize;
+
+      // Filters
+      const where = [];
+      const params = [];
+
+      const includeInactive = (req.query && (req.query.includeInactive === 'true' || req.query.includeInactive === true));
+      const status = (req.query.status || '').trim();
+      if (status) {
+        where.push("COALESCE(status,'active') = ?");
+        params.push(status);
+      } else if (!includeInactive) {
+        where.push("COALESCE(status,'active') = 'active'");
+      }
+
+      const classLevel = (req.query.classLevel || '').trim();
+      if (classLevel) { where.push('classLevel = ?'); params.push(classLevel); }
+
+      const department = (req.query.department || '').trim();
+      if (department) { where.push('department = ?'); params.push(department); }
+
+      const series = (req.query.series || '').trim();
+      if (series) { where.push('series = ?'); params.push(series); }
+
+      const gender = (req.query.gender || '').trim();
+      if (gender) { where.push('gender = ?'); params.push(gender); }
+
+      const q = (req.query.q || req.query.name || '').toString().trim();
+      if (q) {
+        const like = `%${q}%`;
+        where.push(`(firstName LIKE ? OR lastName LIKE ? OR ${MATRICULE_COL_QUOTED} LIKE ?)`);
+        params.push(like, like, like);
+      }
+
+      const feesPaidMin = req.query.feesPaidMin != null ? Number(req.query.feesPaidMin) : null;
+      const feesPaidMax = req.query.feesPaidMax != null ? Number(req.query.feesPaidMax) : null;
+      if (!Number.isNaN(feesPaidMin) && feesPaidMin != null) { where.push('feesPaid >= ?'); params.push(feesPaidMin); }
+      if (!Number.isNaN(feesPaidMax) && feesPaidMax != null) { where.push('feesPaid <= ?'); params.push(feesPaidMax); }
+
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+      // Count total
+      db.get(`SELECT COUNT(*) as total FROM students ${whereSql}`, params, (errCount, countRow) => {
+        if (errCount) return res.status(500).json({ error: errCount.message });
+        const total = countRow ? countRow.total : 0;
+        // Page data
+        const dataSql = `SELECT * FROM students ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`;
+        const dataParams = params.concat([pageSize, offset]);
+        db.all(dataSql, dataParams, (err, rows) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ data: rows || [], page, pageSize, total });
+        });
+      });
+    } catch (e) {
+      console.error('GET /api/students error', e);
+      res.status(500).json({ error: 'Failed to fetch students' });
+    }
   });
 
   // POST new student

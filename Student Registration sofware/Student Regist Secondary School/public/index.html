@@ -127,6 +127,8 @@
           <option value="">All Departments</option>
           <option value="arts" data-i18n="arts">Arts</option>
           <option value="science" data-i18n="science">Science</option>
+          <option value="commercial" data-i18n="commercial">Commercial</option>
+          <option value="general" data-i18n="general">General</option>
         </select>
       </div>
       <div class="search-input-group">
@@ -134,6 +136,8 @@
           <option value="">All Series</option>
           <option value="A1">A1</option>
           <option value="A2">A2</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
           <option value="A3">A3</option>
           <option value="A4">A4</option>
           <option value="S1">S1</option>
@@ -246,6 +250,8 @@
                 <option value="" selected>-</option>
                 <option value="arts" data-i18n="arts">Arts</option>
                 <option value="science" data-i18n="science">Science</option>
+                <option value="comercial" data-i18n="comercial">Commercial</option>
+                <option value="general" data-i18n="general">General</option>
               </select>
             </div>
            <div class="form-group" id="series-group" style="display:none;">
@@ -262,6 +268,9 @@
                 <option value="S2" class="science-series">S2 - Biology & Geology</option>
                 <option value="S3" class="science-series">S3 - Technology & Engineering</option>
                 <option value="S4" class="science-series">S4 - Computer Science</option>
+                <!-- Commercial series -->
+                <option value="C" class="commercial-series">C - Economics & Mathematics</option>
+                <option value="D" class="commercial-series">D - Economics & Geography</option>
               </select>
             </div>
           </div>
@@ -302,10 +311,14 @@
     </div>
 
     <!-- Pagination controls -->
-    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:12px; justify-content:center; margin: 16px 0;">
-      <button id="prevPageBtn" class="btn" type="button">Prev</button>
+    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:8px; justify-content:center; margin: 16px 0;">
+      <button id="prevPageBtn" class="btn btn-secondary" type="button" disabled>
+        <i class="fas fa-chevron-left"></i> Prev
+      </button>
       <span id="pageInfo">Page 1</span>
-      <button id="nextPageBtn" class="btn" type="button">Next</button>
+      <button id="nextPageBtn" class="btn btn-secondary" type="button" disabled>
+        Next <i class="fas fa-chevron-right"></i>
+      </button>
       <span id="totalInfo" style="color:#666"></span>
     </div>
     

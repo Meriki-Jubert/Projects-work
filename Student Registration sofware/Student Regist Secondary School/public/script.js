@@ -228,6 +228,8 @@ const i18n = {
     department: 'Department',
     arts: 'Arts',
     science: 'Science',
+    comercial: 'Commercial',
+    general: 'General',
     series: 'Series',
     allDepartments: 'All Departments',
     allSeries: 'All Series',
@@ -360,6 +362,8 @@ const i18n = {
     department: 'Département',
     arts: 'Arts',
     science: 'Sciences',
+    comercial: 'Commercial',
+    general: 'Général',
     series: 'Série',
     allDepartments: 'Tous les départements',
     allSeries: 'Toutes les séries',
@@ -538,8 +542,44 @@ const seriesSelect = document.getElementById('series');
 function updateDeptSeriesVisibility() {
   const val = classSelect ? classSelect.value : '';
   const isSixth = val === 'lower-sixth' || val === 'upper-sixth';
-  const isDept = isSixth || val === 'form4' || val === 'form5';
-  const isSeries = isSixth; // only for lower/upper sixth
+  const isDept = val === 'form3' || val === 'form4' || val === 'form5' || isSixth;
+
+  // Determine which department options should be available based on class
+  if (departmentSelect) {
+    const opts = Array.from(departmentSelect.options);
+    // Map for quick access
+    const byValue = Object.fromEntries(opts.map(o => [o.value, o]));
+    const showOnly = (allowed) => {
+      opts.forEach((opt, idx) => {
+        if (idx === 0) { // placeholder
+          opt.disabled = false; opt.hidden = false; opt.style.display = '';
+          return;
+        }
+        const visible = allowed.includes(opt.value);
+        opt.disabled = !visible;
+        opt.hidden = !visible;
+        opt.style.display = visible ? '' : 'none';
+      });
+      // Reset selection if now invalid
+      if (departmentSelect.value && (!byValue[departmentSelect.value] || byValue[departmentSelect.value].disabled)) {
+        departmentSelect.value = '';
+      }
+    };
+
+    if (val === 'form3' || val === 'form4') {
+      // Only Commercial and General for Forms 3-4
+      showOnly(['comercial', 'general']);
+    } else if (val === 'form5' || isSixth) {
+      // Arts, Science, and Commercial for Form 5 and Sixth
+      showOnly(['arts', 'science', 'comercial']);
+    } else {
+      // Other classes: hide all department choices
+      showOnly([]);
+    }
+  }
+
+  // Series visible for sixth forms regardless of department selection
+  const isSeries = isSixth;
 
   if (deptGroup) deptGroup.style.display = isDept ? '' : 'none';
   if (seriesGroup) seriesGroup.style.display = isSeries ? '' : 'none';
@@ -547,8 +587,8 @@ function updateDeptSeriesVisibility() {
   // Clear fields when hidden
   if (!isDept && departmentSelect) departmentSelect.value = '';
   if (!isSeries && seriesSelect) seriesSelect.value = '';
-  
-  // When series is visible, ensure options reflect chosen department
+
+  // Ensure series options reflect chosen department when series is visible
   if (isSeries) updateSeriesOptions();
 }
 
@@ -557,6 +597,7 @@ function updateSeriesOptions() {
   const dept = (departmentSelect && departmentSelect.value) || '';
   const isArts = dept === 'arts';
   const isScience = dept === 'science';
+  const isCommercial = dept === 'comercial';
   // Iterate options and toggle visibility based on class on the option
   Array.from(seriesSelect.options).forEach((opt, idx) => {
     // Always keep the first placeholder option visible
@@ -568,9 +609,11 @@ function updateSeriesOptions() {
     }
     const isArtsSeries = opt.classList.contains('arts-series');
     const isScienceSeries = opt.classList.contains('science-series');
-    let visible = true;
+    const isCommercialSeries = opt.classList.contains('commercial-series');
+    let visible = false;
     if (isArts) visible = isArtsSeries;
     else if (isScience) visible = isScienceSeries;
+    else if (isCommercial) visible = isCommercialSeries;
     // Show/hide
     opt.disabled = !visible;
     opt.hidden = !visible;
