@@ -14,7 +14,7 @@ let classFees = {
 
 // Pagination state
 let currentPage = 1;
-let pageSize = 100; // server caps at 100
+let pageSize = 100; // Increased default page size to 100
 let totalCount = 0;
 
 //My Utility Functions
@@ -22,22 +22,17 @@ let totalCount = 0;
   // Show notifications to user
 
 function showNotification(message, type = "info", duration = 3000) {
-  const notification = document.getElementById("notification");
-  if (!notification) return;
-  // Accessibility: ensure aria-live region
-  notification.setAttribute('role', 'status');
-  notification.setAttribute('aria-live', 'polite');
-  notification.setAttribute('aria-atomic', 'true');
-  notification.textContent = message;
+    const notification = document.getElementById("notification");
+    notification.textContent = message;
 
-  // Remove any previous type classes
-  notification.className = "notification";
-  notification.classList.add(type);
-  notification.classList.add("show");
+    // Remove any previous type classes
+    notification.className = "notification";
+    notification.classList.add(type);
+    notification.classList.add("show");
 
-  setTimeout(() => {
-    notification.classList.remove("show");
-  }, duration);
+    setTimeout(() => {
+        notification.classList.remove("show");
+    }, duration);
 }
  
 
@@ -228,8 +223,6 @@ const i18n = {
     department: 'Department',
     arts: 'Arts',
     science: 'Science',
-    comercial: 'Commercial',
-    general: 'General',
     series: 'Series',
     allDepartments: 'All Departments',
     allSeries: 'All Series',
@@ -362,8 +355,6 @@ const i18n = {
     department: 'Département',
     arts: 'Arts',
     science: 'Sciences',
-    comercial: 'Commercial',
-    general: 'Général',
     series: 'Série',
     allDepartments: 'Tous les départements',
     allSeries: 'Toutes les séries',
@@ -542,44 +533,8 @@ const seriesSelect = document.getElementById('series');
 function updateDeptSeriesVisibility() {
   const val = classSelect ? classSelect.value : '';
   const isSixth = val === 'lower-sixth' || val === 'upper-sixth';
-  const isDept = val === 'form3' || val === 'form4' || val === 'form5' || isSixth;
-
-  // Determine which department options should be available based on class
-  if (departmentSelect) {
-    const opts = Array.from(departmentSelect.options);
-    // Map for quick access
-    const byValue = Object.fromEntries(opts.map(o => [o.value, o]));
-    const showOnly = (allowed) => {
-      opts.forEach((opt, idx) => {
-        if (idx === 0) { // placeholder
-          opt.disabled = false; opt.hidden = false; opt.style.display = '';
-          return;
-        }
-        const visible = allowed.includes(opt.value);
-        opt.disabled = !visible;
-        opt.hidden = !visible;
-        opt.style.display = visible ? '' : 'none';
-      });
-      // Reset selection if now invalid
-      if (departmentSelect.value && (!byValue[departmentSelect.value] || byValue[departmentSelect.value].disabled)) {
-        departmentSelect.value = '';
-      }
-    };
-
-    if (val === 'form3' || val === 'form4') {
-      // Only Commercial and General for Forms 3-4
-      showOnly(['comercial', 'general']);
-    } else if (val === 'form5' || isSixth) {
-      // Arts, Science, and Commercial for Form 5 and Sixth
-      showOnly(['arts', 'science', 'comercial']);
-    } else {
-      // Other classes: hide all department choices
-      showOnly([]);
-    }
-  }
-
-  // Series visible for sixth forms regardless of department selection
-  const isSeries = isSixth;
+  const isDept = isSixth || val === 'form4' || val === 'form5';
+  const isSeries = isSixth; // only for lower/upper sixth
 
   if (deptGroup) deptGroup.style.display = isDept ? '' : 'none';
   if (seriesGroup) seriesGroup.style.display = isSeries ? '' : 'none';
@@ -587,8 +542,8 @@ function updateDeptSeriesVisibility() {
   // Clear fields when hidden
   if (!isDept && departmentSelect) departmentSelect.value = '';
   if (!isSeries && seriesSelect) seriesSelect.value = '';
-
-  // Ensure series options reflect chosen department when series is visible
+  
+  // When series is visible, ensure options reflect chosen department
   if (isSeries) updateSeriesOptions();
 }
 
@@ -597,7 +552,6 @@ function updateSeriesOptions() {
   const dept = (departmentSelect && departmentSelect.value) || '';
   const isArts = dept === 'arts';
   const isScience = dept === 'science';
-  const isCommercial = dept === 'comercial';
   // Iterate options and toggle visibility based on class on the option
   Array.from(seriesSelect.options).forEach((opt, idx) => {
     // Always keep the first placeholder option visible
@@ -609,11 +563,9 @@ function updateSeriesOptions() {
     }
     const isArtsSeries = opt.classList.contains('arts-series');
     const isScienceSeries = opt.classList.contains('science-series');
-    const isCommercialSeries = opt.classList.contains('commercial-series');
-    let visible = false;
+    let visible = true;
     if (isArts) visible = isArtsSeries;
     else if (isScience) visible = isScienceSeries;
-    else if (isCommercial) visible = isCommercialSeries;
     // Show/hide
     opt.disabled = !visible;
     opt.hidden = !visible;
@@ -654,8 +606,6 @@ let lastActionWasSearch = false; // track if the last fetch was triggered by sea
 // Loader state (throttled to avoid flicker)
 let loaderTimer = null;
 let loaderVisible = false;
-// Debounce timer for live search
-let searchDebounceTimer = null;
 
 // Loader helpers (throttled show)
 function showLoader(text = 'Loading...', delayMs = 150) {
@@ -728,43 +678,128 @@ async function fetchStudents() {
     params.set('page', String(currentPage));
     params.set('pageSize', String(pageSize));
 
+    // Get all search input values at the start of the function
+    const searchQuery = searchInput?.value.trim() || '';
+    const ageSearchEl = document.getElementById('search-age');
+    const feesStatusEl = document.getElementById('search-fee-status');
+    const ageSearch = ageSearchEl ? ageSearchEl.value.trim() : '';
+    const feesStatus = feesStatusEl ? feesStatusEl.value.trim() : '';
+    
+    // Log all parameters for debugging
+    const logParams = {
+      page: currentPage,
+      pageSize: pageSize,
+      statusSel: statusSel,
+      searchQuery: searchQuery,
+      ageSearch: ageSearch,
+      feesStatus: feesStatus,
+      classLevel: searchClass?.value || '',
+      gender: searchGender?.value || '',
+      department: searchDepartment?.value || '',
+      series: searchSeries?.value || ''
+    };
+    
+    console.log('Fetching students with params:', logParams);
+
     // status/includeInactive
     if (statusSel === 'all') {
       params.set('includeInactive', 'true');
-    } else {
-      params.set('status', statusSel); // 'active' or 'inactive'
+    } else if (statusSel === 'inactive') {
+      params.set('status', 'inactive');
     }
 
-    // Filters from UI
-    const hasQ = !!(searchInput && searchInput.value.trim());
-    const hasClass = !!(searchClass && searchClass.value);
-    const hasGender = !!(searchGender && searchGender.value);
-    const hasDept = !!(searchDepartment && searchDepartment.value);
-    const hasSeries = !!(searchSeries && searchSeries.value);
-    if (hasQ) params.set('q', searchInput.value.trim());
-    if (hasClass) params.set('classLevel', searchClass.value);
-    if (hasGender) params.set('gender', searchGender.value);
-    if (hasDept) params.set('department', searchDepartment.value);
-    if (hasSeries) params.set('series', searchSeries.value);
+    // Text search (name or matricule)
+    if (searchQuery) {
+      params.set('q', searchQuery);
+    }
+
+    // Age search (exact match)
+    if (ageSearch) params.set('age', ageSearch);
+
+    // Other filters
+    if (searchClass?.value) params.set('classLevel', searchClass.value);
+    if (searchGender?.value) params.set('gender', searchGender.value);
+    if (searchDepartment?.value) params.set('department', searchDepartment.value);
+    if (searchSeries?.value) params.set('series', searchSeries.value);
 
     const url = apiUrl(`/api/students?${params.toString()}`);
+    console.log('API Request URL:', url);
+    
     const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch students');
-    const payload = await response.json();
-    const rows = Array.isArray(payload) ? payload : (payload.data || []);
-    totalCount = Array.isArray(payload) ? rows.length : (payload.total || rows.length || 0);
-
-    students = rows;
-    filteredStudents = rows; // already filtered server-side
-    renderStudents(filteredStudents);
-    updateStats(filteredStudents);
-    updatePaginationUI();
-    if (lastActionWasSearch) {
-      showNotification(tf('notifStudentsFound', { count: totalCount }), 'info');
-    } else {
-      showNotification(t('notifStudentsLoaded'), 'info');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error:', { status: response.status, statusText: response.statusText, errorText });
+      throw new Error('Failed to fetch students');
     }
-    lastActionWasSearch = false;
+    
+    const responseData = await response.json();
+    console.log('API Response:', responseData);
+    
+    // Extract the array of students from the response
+    // The response could be either an array directly or an object with a data property
+    let students = Array.isArray(responseData) ? responseData : (responseData.data || []);
+    const totalCount = responseData.total || students.length;
+    
+    console.log(`Processing ${students.length} students from API, total: ${totalCount}`);
+    
+    // Apply fees status filter on the frontend if needed
+    if (feesStatus) {
+      students = students.filter(student => {
+        const requiredFees = classFees[student.classLevel] || 0;
+        const feesPaid = student.feesPaid || 0;
+        
+        if (feesStatus === 'completed') {
+          return feesPaid >= requiredFees;
+        } else if (feesStatus === 'owing') {
+          return feesPaid < requiredFees;
+        }
+        return true;
+      });
+      
+      console.log(`Filtered to ${students.length} students by fees status: ${feesStatus}`);
+    }
+    
+    // Debug: Log the raw response data
+    console.log('Raw API response data:', responseData);
+    
+    // Ensure students is an array
+    if (!Array.isArray(students)) {
+      console.error('Expected students to be an array, got:', typeof students);
+      students = [];
+    }
+    
+    // Update the global variables
+    filteredStudents = students;
+    const filteredCount = students.length;
+    console.log(`Processing ${filteredCount} students for rendering`);
+    
+    // Debug: Log first few students
+    if (students.length > 0) {
+      console.log('Sample student data:', students.slice(0, 3).map(s => ({
+        id: s.id,
+        name: `${s.firstName} ${s.lastName}`,
+        classLevel: s.classLevel,
+        feesPaid: s.feesPaid,
+        hasProfilePic: !!s.profilePic
+      })));
+    }
+    
+    // Force a reflow to ensure DOM is ready
+    setTimeout(() => {
+      renderStudents(filteredStudents);
+      updateStats(filteredStudents);
+      updatePaginationUI();
+      
+      // Show appropriate notification with filtered count
+      if (lastActionWasSearch) {
+        showNotification(tf('notifStudentsFound', { count: filteredCount }), 'info');
+      } else {
+        showNotification(t('notifStudentsLoaded'), 'info');
+      }
+      
+      // Reset the search flag after showing the notification
+      lastActionWasSearch = false;
+    }, 0);
   } catch (error) {
     showNotification(t('notifErrorLoadingStudents'), 'error');
   } finally {
@@ -796,12 +831,31 @@ function renderStudents(studentList) {
 
   // Add each student card as a grid item after the form
   studentList.forEach(student => {
-    const cardDiv = document.createElement('div');
-    cardDiv.innerHTML = renderStudentCard(student);
-    appGrid.appendChild(cardDiv.firstElementChild);
+    try {
+      console.log('Rendering student:', student.id, student.firstName, student.lastName);
+      const cardHtml = renderStudentCard(student);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = cardHtml.trim();
+      const cardElement = tempDiv.firstChild;
+      
+      if (cardElement) {
+        appGrid.appendChild(cardElement);
+      } else {
+        console.error('Failed to create card element for student:', student.id);
+      }
+    } catch (error) {
+      console.error('Error rendering student card:', error, student);
+    }
   });
 
-  attachCardEventListeners();
+  // Only attach event listeners if we successfully rendered cards
+  if (studentList.length > 0) {
+    try {
+      attachCardEventListeners();
+    } catch (error) {
+      console.error('Error attaching event listeners:', error);
+    }
+  }
 }
 
 function renderStudentCard(student) {
@@ -855,44 +909,70 @@ function renderStudentCard(student) {
 
 //showNotification('Student added successfully', 'success');
  
-// Attach event listeners to student card buttons (Edit, Delete, Print)
-
+// Use event delegation for dynamic elements
 function attachCardEventListeners() {
-  // Edit buttons
-  document.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', onEditStudent);
-  });
+  const appGrid = document.getElementById('appGrid');
+  if (!appGrid) return;
 
-  // Delete buttons
-  document.querySelectorAll('.delete-btn').forEach(btn => {
-    btn.addEventListener('click', onDeleteStudent);
-  });
+  // Single event listener for all card actions
+  appGrid.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.edit-btn');
+    const deleteBtn = e.target.closest('.delete-btn');
+    const printBtn = e.target.closest('.print-btn');
+    const inactivateBtn = e.target.closest('.inactivate-btn');
+    const reactivateBtn = e.target.closest('.reactivate-btn');
 
-  // Print buttons (print single student card)
-  document.querySelectorAll('.print-btn').forEach(btn => {
-    btn.addEventListener('click', onPrintSingleStudent);
-  });
-
-  // Inactivate buttons
-  document.querySelectorAll('.inactivate-btn').forEach(btn => {
-    btn.addEventListener('click', onInactivateStudent);
-  });
-
-  // Reactivate buttons
-  document.querySelectorAll('.reactivate-btn').forEach(btn => {
-    btn.addEventListener('click', onReactivateStudent);
+    if (editBtn) onEditStudent(e);
+    else if (deleteBtn) onDeleteStudent(e);
+    else if (printBtn) onPrintSingleStudent(e);
+    else if (inactivateBtn) onInactivateStudent(e);
+    else if (reactivateBtn) onReactivateStudent(e);
   });
 }
 
 // Print Single Student Card
 
-function onPrintSingleStudent(e) {
-  const card = e.target.closest('.student-card');
-  if (!card) return;
-  const studentId = card.dataset.id;
-  const student = students.find(s => s.id == studentId);
-  if (!student) return;
-  printStudent(student);
+async function onPrintSingleStudent(e) {
+  try {
+    const card = e.target.closest('.student-card');
+    if (!card) return;
+    
+    const studentId = card.dataset.id;
+    if (!studentId) {
+      console.error('No student ID found on card');
+      return;
+    }
+
+    // Try to get student from filteredStudents first, then fetch if not found
+    let student = filteredStudents?.find(s => s.id == studentId);
+    
+    if (!student) {
+      // If not in filtered list, try to fetch the student data
+      showLoader('Loading student data...');
+      try {
+        const response = await fetch(apiUrl(`/api/students/${studentId}`));
+        if (!response.ok) throw new Error('Failed to fetch student data');
+        student = await response.json();
+      } catch (error) {
+        console.error('Error fetching student:', error);
+        showNotification(t('errorLoadingStudent'), 'error');
+        return;
+      } finally {
+        hideLoader();
+      }
+    }
+
+    if (!student) {
+      console.error('Student not found');
+      return;
+    }
+
+    // Call print function with the student data
+    printStudent(student);
+  } catch (error) {
+    console.error('Error in onPrintSingleStudent:', error);
+    showNotification(t('errorLoadingStudent'), 'error');
+  }
 }
 
 // Print student in card style with picture and fees info
@@ -1129,37 +1209,88 @@ document.getElementById('clear-btn').addEventListener('click', function() {
 // script.js part 2
 // Edit Student - populate form with existing data
 
-function onEditStudent(e) {
-  
-  const card = e.target.closest('.student-card');
-  if (!card) return;
-  const studentId = card.dataset.id;
-  const student = students.find(s => s.id == studentId);
-  if (!student) return;
-  
-document.getElementById('existingPic').value = student.profilePic || '';
+async function onEditStudent(e) {
+  try {
+    const card = e.target.closest('.student-card');
+    if (!card) return;
+    
+    const studentId = card.dataset.id;
+    if (!studentId) {
+      console.error('No student ID found on card');
+      return;
+    }
 
-const preview = document.getElementById('profilePicPreview');
-if (student.profilePic) {
-  preview.src = apiUrl(student.profilePic);
-  preview.style.display = 'block';
-} else {
-  preview.src = '';
-  preview.style.display = 'none';
-}
+    // Try to get student from filteredStudents first, then fetch if not found
+    let student = filteredStudents?.find(s => s.id == studentId);
+    
+    if (!student) {
+      // If not in filtered list, try to fetch the student data
+      showLoader('Loading student data...');
+      try {
+        const response = await fetch(apiUrl(`/api/students/${studentId}`));
+        if (!response.ok) throw new Error('Failed to fetch student data');
+        student = await response.json();
+      } catch (error) {
+        console.error('Error fetching student:', error);
+        showNotification(t('errorLoadingStudent'), 'error');
+        return;
+      } finally {
+        hideLoader();
+      }
+    }
 
-  // Populate form fields
-  studentForm.dataset.editingId = studentId;
-  studentForm.firstName.value = student.firstName;
-  studentForm.lastName.value = student.lastName;
-  studentForm.dob.value = student.dob;
-  studentForm.gender.value = student.gender;
-  studentForm.classLevel.value = student.classLevel;
-  updateDeptSeriesVisibility();
-  if (departmentSelect) departmentSelect.value = student.department || '';
-  if (seriesSelect) seriesSelect.value = student.series || '';
-  studentForm.feesPaid.value = student.feesPaid;
-  studentForm.phone.value = student.phone || '';
+    if (!student) {
+      console.error('Student not found');
+      return;
+    }
+
+    // Set form values
+    document.getElementById('existingPic').value = student.profilePic || '';
+    
+    const preview = document.getElementById('profilePicPreview');
+    if (student.profilePic) {
+      preview.src = apiUrl(student.profilePic);
+      preview.style.display = 'block';
+    } else {
+      preview.src = '';
+      preview.style.display = 'none';
+    }
+
+    // Populate form fields
+    studentForm.dataset.editingId = studentId;
+    studentForm.firstName.value = student.firstName || '';
+    studentForm.lastName.value = student.lastName || '';
+    studentForm.dob.value = student.dob || '';
+    studentForm.gender.value = student.gender || '';
+    
+    // Set class level and update department/series visibility
+    studentForm.classLevel.value = student.classLevel || '';
+    
+    // Small delay to ensure the DOM updates
+    setTimeout(() => {
+      if (departmentSelect) {
+        departmentSelect.value = student.department || '';
+        updateDeptSeriesVisibility();
+        
+        // Another small delay to ensure department change is processed
+        setTimeout(() => {
+          if (seriesSelect) {
+            seriesSelect.value = student.series || '';
+          }
+        }, 50);
+      }
+      
+      studentForm.feesPaid.value = student.feesPaid || '';
+      studentForm.phone.value = student.phone || '';
+      
+      // Scroll to form
+      document.querySelector('.form-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+    
+  } catch (error) {
+    console.error('Error in onEditStudent:', error);
+    showNotification(t('errorLoadingStudent'), 'error');
+  }
 }
 
 // Delete Student with confirmation
@@ -1236,59 +1367,125 @@ async function onReactivateStudent(e) {
   }
 }
 
+// Debounce utility function
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
+}
+
 // Search Logic - filter students based on search criteria
 
 // Refresh list when status filter changes (Active/Inactive/All)
 if (searchStatus) {
   searchStatus.addEventListener('change', () => {
     currentPage = 1;
+    lastActionWasSearch = true;
     fetchStudents();
   });
 }
 
-// Search Logic - filter students based on search criteria
-
-searchBtn.addEventListener('click', async () => {
+// Handle search button click
+searchBtn.addEventListener('click', () => {
   currentPage = 1;
   lastActionWasSearch = true;
-  await fetchStudents();
+  fetchStudents();
 });
 
-// Enter key on search input triggers count-aware search
+// Debounced search handler for text input
+const handleSearch = debounce(() => {
+  currentPage = 1;
+  lastActionWasSearch = true;
+  fetchStudents();
+}, 500);
+
+// Handle search input events
 if (searchInput) {
-  searchInput.addEventListener('keydown', async (e) => {
+  // Handle Enter key
+  searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      e.preventDefault();
       currentPage = 1;
       lastActionWasSearch = true;
-      await fetchStudents();
+      fetchStudents();
     }
   });
-  // Debounced live search (no count notification)
-  searchInput.addEventListener('input', () => {
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(() => {
+  
+  // Handle input with debounce
+  searchInput.addEventListener('input', handleSearch);
+}
+
+// Handle age search input
+const ageSearchInput = document.getElementById('search-age');
+if (ageSearchInput) {
+  ageSearchInput.addEventListener('input', debounce(() => {
+    console.log('Age input changed:', ageSearchInput.value);
+    currentPage = 1;
+    lastActionWasSearch = true;
+    fetchStudents();
+  }, 500));
+
+  ageSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      console.log('Age search with Enter:', ageSearchInput.value);
       currentPage = 1;
-      lastActionWasSearch = false;
+      lastActionWasSearch = true;
       fetchStudents();
-    }, 350);
+    }
   });
 }
 
-// Reset Search Filters and Show All Students
+// Handle fee status change
+const feesStatusSelect = document.getElementById('search-fee-status');
+if (feesStatusSelect) {
+  feesStatusSelect.addEventListener('change', (e) => {
+    console.log('Fees status changed:', e.target.value);
+    currentPage = 1;
+    lastActionWasSearch = true;
+    fetchStudents();
+  });
+}
 
+// Handle class, gender, department, and series changes
+[searchClass, searchGender, searchDepartment, searchSeries].forEach(select => {
+  if (select) {
+    select.addEventListener('change', () => {
+      currentPage = 1;
+      lastActionWasSearch = true;
+      fetchStudents();
+    });
+  }
+});
+
+// Reset Search Filters and Show All Students
 resetSearchBtn.addEventListener('click', () => {
-  searchInput.value = '';
-  searchClass.value = '';
-  searchGender.value = '';
-  searchAge.value = '';
-  if (searchFeeStatus) searchFeeStatus.value = '';
+  // Clear all search inputs
+  if (searchInput) searchInput.value = '';
+  if (searchClass) searchClass.value = '';
+  if (searchGender) searchGender.value = '';
+  
+  // Clear age search
+  const ageSearchInput = document.getElementById('search-age');
+  if (ageSearchInput) ageSearchInput.value = '';
+  
+  // Clear fees status
+  const feesStatusSelect = document.getElementById('search-fee-status');
+  if (feesStatusSelect) feesStatusSelect.value = '';
+  
+  // Reset other filters
   if (searchStatus) searchStatus.value = 'active';
   if (searchDepartment) searchDepartment.value = '';
   if (searchSeries) searchSeries.value = '';
+  
+  // Reset pagination and fetch
   currentPage = 1;
   lastActionWasSearch = false;
   fetchStudents();
+  
+  // Show notification
+  showNotification(t('notifSearchReset'), 'info');
 });
 
 // Pagination buttons

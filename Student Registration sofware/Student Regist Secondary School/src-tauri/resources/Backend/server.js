@@ -98,6 +98,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // Ensure students.matricule
     db.all('PRAGMA table_info(students)', (err, columns) => {
       if (err) return cb(err);
+      
       const matriculeCol = columns.find(c => c.name.toLowerCase() === 'matricule');
       const hasMatricule = !!matriculeCol;
       const hasPhone = columns.some(c => c.name.toLowerCase() === 'phone');
@@ -105,35 +106,52 @@ const db = new sqlite3.Database(dbPath, (err) => {
       const hasInactiveAt = columns.some(c => c.name.toLowerCase() === 'inactiveat');
       const hasDepartment = columns.some(c => c.name.toLowerCase() === 'department');
       const hasSeries = columns.some(c => c.name.toLowerCase() === 'series');
+      
       if (hasMatricule) {
         MATRICULE_COL = matriculeCol.name; // preserve actual case
         MATRICULE_COL_QUOTED = /[^a-z0-9_]/i.test(MATRICULE_COL) || MATRICULE_COL !== MATRICULE_COL.toLowerCase()
-          ? `"${MATRICULE_COL}` + `"`
+          ? `"${MATRICULE_COL}"`
           : MATRICULE_COL;
       }
+
+      // Helper functions for adding columns
       const addMatricule = (next) => {
         if (hasMatricule) return next();
-        db.run('ALTER TABLE students ADD COLUMN matricule TEXT UNIQUE', (e) => next());
+        db.run('ALTER TABLE students ADD COLUMN matricule TEXT UNIQUE', (e) => next(e));
       };
+
       const addPhone = (next) => {
         if (hasPhone) return next();
-        db.run('ALTER TABLE students ADD COLUMN phone TEXT', () => next());
+        db.run('ALTER TABLE students ADD COLUMN phone TEXT', (e) => next(e));
       };
+
       const addStatus = (next) => {
         if (hasStatus) return next();
-        db.run("ALTER TABLE students ADD COLUMN status TEXT DEFAULT 'active'", () => next());
+        db.run("ALTER TABLE students ADD COLUMN status TEXT DEFAULT 'active'", (e) => next(e));
       };
+
       const addInactiveAt = (next) => {
         if (hasInactiveAt) return next();
-        db.run('ALTER TABLE students ADD COLUMN inactiveAt TEXT', () => next());
+        db.run('ALTER TABLE students ADD COLUMN inactiveAt TEXT', (e) => next(e));
       };
+
       const addDepartment = (next) => {
         if (hasDepartment) return next();
-        db.run('ALTER TABLE students ADD COLUMN department TEXT', () => next());
+        db.run('ALTER TABLE students ADD COLUMN department TEXT', (e) => next(e));
       };
+
       const addSeries = (next) => {
         if (hasSeries) return next();
-        db.run('ALTER TABLE students ADD COLUMN series TEXT', () => next());
+        db.run('ALTER TABLE students ADD COLUMN series TEXT', (e) => next(e));
+      };
+      
+      const addFeesTotal = (next) => {
+        const hasFeesTotal = columns.some(c => c.name.toLowerCase() === 'feestotal');
+        if (hasFeesTotal) return next();
+        db.run('ALTER TABLE students ADD COLUMN feesTotal INTEGER DEFAULT 0', (err) => {
+          if (err) console.error('Error adding feesTotal column:', err);
+          next();
+        });
       };
 
       // Ensure helpful indexes exist (idempotent)
@@ -148,62 +166,112 @@ const db = new sqlite3.Database(dbPath, (err) => {
           `CREATE INDEX IF NOT EXISTS idx_students_${MATRICULE_COL}_nocase ON students(${MATRICULE_COL})`,
           "CREATE INDEX IF NOT EXISTS idx_students_inactiveAt ON students(inactiveAt)",
         ];
+        
         let i = 0;
         const runNext = () => {
           if (i >= stmts.length) return next();
-          db.run(stmts[i], () => { i++; runNext(); });
+          db.run(stmts[i], (err) => {
+            if (err) console.error('Error creating index:', stmts[i], err);
+            i++;
+            runNext();
+          });
         };
         runNext();
       };
 
-      // Chain column additions then indexes, then proceed to school/license columns
-      addMatricule(() => {
-        addPhone(() => {
-          addStatus(() => {
-            addInactiveAt(() => {
-              addDepartment(() => {
-                addSeries(() => {
-                  addIndexes(() => {
-                    // Ensure school.code and school.academicYear
-                    db.all('PRAGMA table_info(school)', (err2, cols2) => {
-                      if (err2) return cb(err2);
-                      const hasCode = cols2.some(c => c.name.toLowerCase() === 'code');
-                      const hasYear = cols2.some(c => c.name.toLowerCase() === 'academicyear');
-                      const addCode = (next) => {
-                        if (hasCode) return next();
-                        db.run('ALTER TABLE school ADD COLUMN code TEXT', () => next());
-                      };
-                      const addYear = (next) => {
-                        if (hasYear) return next();
-                        db.run('ALTER TABLE school ADD COLUMN academicYear TEXT', () => next());
-                      };
+      // Function to check and add school table columns
+      const ensureSchoolColumns = (next) => {
+        db.all('PRAGMA table_info(school)', (err, cols) => {
+          if (err) return next(err);
+          
+          const hasCode = cols.some(c => c.name.toLowerCase() === 'code');
+          const hasYear = cols.some(c => c.name.toLowerCase() === 'academicyear');
+          
+          const addCode = (cb) => {
+            if (hasCode) return cb();
+            db.run('ALTER TABLE school ADD COLUMN code TEXT', (e) => {
+              if (e) console.error('Error adding school.code:', e);
+              cb();
+            });
+          };
+          
+          const addYear = (cb) => {
+            if (hasYear) return cb();
+            db.run('ALTER TABLE school ADD COLUMN academicYear TEXT', (e) => {
+              if (e) console.error('Error adding school.academicYear:', e);
+              cb();
+            });
+          };
+          
+          // Run school column additions in series
+          addCode(() => addYear(next));
+        });
+      };
 
-                      // Ensure license columns
-                      db.all('PRAGMA table_info(license)', (err3, cols3) => {
-                        const hasActivatedAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'activatedat');
-                        const addActivatedAt = (next) => {
-                          if (hasActivatedAt) return next();
-                          db.run('ALTER TABLE license ADD COLUMN activatedAt TEXT', () => next());
-                        };
-                        const hasInitialPurgeAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'initialpurgeat');
-                        const addInitialPurgeAt = (next) => {
-                          if (hasInitialPurgeAt) return next();
-                          db.run('ALTER TABLE license ADD COLUMN initialPurgeAt TEXT', () => next());
-                        };
-                        const hasExpiredAppliedAt = !err3 && Array.isArray(cols3) && cols3.some(c => c.name.toLowerCase() === 'expiredappliedat');
-                        const addExpiredAppliedAt = (next) => {
-                          if (hasExpiredAppliedAt) return next();
-                          db.run('ALTER TABLE license ADD COLUMN expiredAppliedAt TEXT', () => next());
-                        };
+      // Function to check and add license table columns
+      const ensureLicenseColumns = (next) => {
+        db.all('PRAGMA table_info(license)', (err, cols) => {
+          if (err) return next(err);
+          
+          const hasActivatedAt = cols.some(c => c.name.toLowerCase() === 'activatedat');
+          const hasInitialPurgeAt = cols.some(c => c.name.toLowerCase() === 'initialpurgeat');
+          const hasExpiredAppliedAt = cols.some(c => c.name.toLowerCase() === 'expiredappliedat');
+          
+          const addActivatedAt = (cb) => {
+            if (hasActivatedAt) return cb();
+            db.run('ALTER TABLE license ADD COLUMN activatedAt TEXT', (e) => {
+              if (e) console.error('Error adding license.activatedAt:', e);
+              cb();
+            });
+          };
+          
+          const addInitialPurgeAt = (cb) => {
+            if (hasInitialPurgeAt) return cb();
+            db.run('ALTER TABLE license ADD COLUMN initialPurgeAt TEXT', (e) => {
+              if (e) console.error('Error adding license.initialPurgeAt:', e);
+              cb();
+            });
+          };
+          
+          const addExpiredAppliedAt = (cb) => {
+            if (hasExpiredAppliedAt) return cb();
+            db.run('ALTER TABLE license ADD COLUMN expiredAppliedAt TEXT', (e) => {
+              if (e) console.error('Error adding license.expiredAppliedAt:', e);
+              cb();
+            });
+          };
+          
+          // Run license column additions in series
+          addActivatedAt(() => 
+            addInitialPurgeAt(() => 
+              addExpiredAppliedAt(next)
+            )
+          );
+        });
+      };
 
-                        addCode(() => {
-                          addYear(() => {
-                            addActivatedAt(() => {
-                              addInitialPurgeAt(() => {
-                                addExpiredAppliedAt(() => cb());
-                              });
-                            });
-                          });
+      // Main schema update sequence
+      addMatricule((err) => {
+        if (err) return cb(err);
+        addPhone((err) => {
+          if (err) return cb(err);
+          addStatus((err) => {
+            if (err) return cb(err);
+            addInactiveAt((err) => {
+              if (err) return cb(err);
+              addDepartment((err) => {
+                if (err) return cb(err);
+                addSeries((err) => {
+                  if (err) return cb(err);
+                  addFeesTotal((err) => {
+                    if (err) return cb(err);
+                    addIndexes((err) => {
+                      if (err) return cb(err);
+                      ensureSchoolColumns((err) => {
+                        if (err) return cb(err);
+                        ensureLicenseColumns((err) => {
+                          if (err) return cb(err);
+                          cb(); // All schema updates complete
                         });
                       });
                     });
@@ -552,15 +620,56 @@ const db = new sqlite3.Database(dbPath, (err) => {
         params.push(like, like, like);
       }
 
-      const feesPaidMin = req.query.feesPaidMin != null ? Number(req.query.feesPaidMin) : null;
-      const feesPaidMax = req.query.feesPaidMax != null ? Number(req.query.feesPaidMax) : null;
-      if (!Number.isNaN(feesPaidMin) && feesPaidMin != null) { where.push('feesPaid >= ?'); params.push(feesPaidMin); }
-      if (!Number.isNaN(feesPaidMax) && feesPaidMax != null) { where.push('feesPaid <= ?'); params.push(feesPaidMax); }
+      // Exact age search
+      if (req.query.age) {
+        const targetAge = parseInt(req.query.age, 10);
+        console.log('Age search parameter:', { targetAge, query: req.query.age });
+        if (!isNaN(targetAge)) {
+          const today = new Date();
+          const currentYear = today.getFullYear();
+          const currentMonth = today.getMonth();
+          const currentDay = today.getDate();
+          
+          // Calculate birth date range for exact age
+          // Students born between (today - age - 1 years) and (today - age years)
+          const minDate = new Date(currentYear - targetAge - 1, currentMonth, currentDay + 1);
+          const maxDate = new Date(currentYear - targetAge, currentMonth, currentDay);
+          
+          console.log(`Searching for students with age ${targetAge}:`, { 
+            minDate: minDate.toISOString().split('T')[0],
+            maxDate: maxDate.toISOString().split('T')[0],
+            currentYear,
+            currentMonth,
+            currentDay
+          });
+          
+          where.push('(dob > ? AND dob <= ?)');
+          params.push(
+            minDate.toISOString().split('T')[0],
+            maxDate.toISOString().split('T')[0]
+          );
+        }
+      }
+
+      // Fees status search
+      console.log('Fees status query:', req.query.feesStatus);
+      if (req.query.feesStatus) {
+        if (req.query.feesStatus === 'completed') {
+          // Student has paid all fees (feesPaid >= feesTotal and feesTotal > 0)
+          where.push('(students.feesPaid >= students.feesTotal AND students.feesTotal > 0) OR (students.feesTotal = 0 AND students.feesPaid = 0)');
+        } else if (req.query.feesStatus === 'owing') {
+          // Student has not paid all fees (feesPaid < feesTotal or feesPaid is null) and feesTotal > 0
+          where.push('(students.feesPaid < students.feesTotal OR students.feesPaid IS NULL) AND students.feesTotal > 0');
+        }
+      }
 
       const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      const countSql = `SELECT COUNT(*) as total FROM students ${whereSql}`;
+      console.log('SQL Query:', countSql);
+      console.log('Query Parameters:', params);
 
       // Count total
-      db.get(`SELECT COUNT(*) as total FROM students ${whereSql}`, params, (errCount, countRow) => {
+      db.get(countSql, params, (errCount, countRow) => {
         if (errCount) return res.status(500).json({ error: errCount.message });
         const total = countRow ? countRow.total : 0;
         // Page data

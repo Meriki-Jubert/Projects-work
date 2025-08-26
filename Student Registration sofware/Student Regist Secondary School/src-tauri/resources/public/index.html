@@ -101,7 +101,7 @@
       </div>
       <div class="stat-card">
         <i class="fas fa-book fa-2x" style="color: var(--accent);"></i>
-        <div class="stat-number">10</div>
+        <div class="stat-number">7</div>
         <div class="stat-label" data-i18n="classes">Classes</div>
       </div>
     </div>
@@ -124,7 +124,7 @@
       </div>
       <div class="search-input-group">
         <select id="search-department" class="input">
-          <option value="">All Departments</option>
+          <option value="" data-i18n="allDepartments">All Departments</option>
           <option value="arts" data-i18n="arts">Arts</option>
           <option value="science" data-i18n="science">Science</option>
           <option value="commercial" data-i18n="commercial">Commercial</option>
@@ -134,16 +134,19 @@
       <div class="search-input-group">
         <select id="search-series" class="input">
           <option value="">All Series</option>
-          <option value="A1">A1</option>
-          <option value="A2">A2</option>
-          <option value="C">C</option>
-          <option value="D">D</option>
-          <option value="A3">A3</option>
-          <option value="A4">A4</option>
-          <option value="S1">S1</option>
-          <option value="S2">S2</option>
-          <option value="S3">S3</option>
-          <option value="S4">S4</option>
+          <p>Arts Series </p>
+          <option value="A1">A1 - Literature & Languages</option>
+          <option value="A2">A2 - History & Geography</option>
+          <option value="A3">A3 - Economics & Sociology</option>
+          <option value="A4">A4 - Arts & Philosophy</option>
+          <!-- Science Series -->
+          <option value="S1">S1 - Mathematics & Physics</option>
+          <option value="S2">S2 - Biology & Geology</option>
+          <option value="S3">S3 - Technology & Engineering</option>
+          <option value="S4">S4 - Computer Science</option>
+          <!-- Commercial Series -->
+          <option value="C">C - Economics & Mathematics</option>
+          <option value="D">D - Economics & Geography</option>
         </select>
       </div>
       <div class="search-input-group">
@@ -154,13 +157,13 @@
         </select>
       </div>
       <div class="search-input-group">
-        <input type="number" id="search-age" class="input" placeholder="Age..." data-i18n="age">
+        <input type="number" id="age-search" class="input" placeholder="Search by exact age" data-i18n="searchAgePlaceholder">
       </div>
       <div class="search-input-group">
-        <select id="search-fee-status" class="input">
+        <select id="fees-status" class="input">
           <option value="" data-i18n="allFeeStatus">All Fee Status</option>
-          <option value="completed" data-i18n="completed">Completed</option>
-          <option value="owing" data-i18n="owing">Owing</option>
+          <option value="completed" data-i18n="completed">Fees Completed</option>
+          <option value="owing" data-i18n="owing">Fees Owing</option>
         </select>
       </div>
       <div class="search-input-group">
@@ -250,7 +253,7 @@
                 <option value="" selected>-</option>
                 <option value="arts" data-i18n="arts">Arts</option>
                 <option value="science" data-i18n="science">Science</option>
-                <option value="comercial" data-i18n="comercial">Commercial</option>
+                <option value="commercial" data-i18n="commercial">Commercial</option>
                 <option value="general" data-i18n="general">General</option>
               </select>
             </div>
@@ -311,17 +314,13 @@
     </div>
 
     <!-- Pagination controls -->
-    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:8px; justify-content:center; margin: 16px 0;">
-      <button id="prevPageBtn" class="btn btn-secondary" type="button" disabled>
-        <i class="fas fa-chevron-left"></i> Prev
-      </button>
+    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:12px; justify-content:center; margin: 16px 0;">
+      <button id="prevPageBtn" class="btn" type="button">Prev</button>
       <span id="pageInfo">Page 1</span>
-      <button id="nextPageBtn" class="btn btn-secondary" type="button" disabled>
-        Next <i class="fas fa-chevron-right"></i>
-      </button>
+      <button id="nextPageBtn" class="btn" type="button">Next</button>
       <span id="totalInfo" style="color:#666"></span>
     </div>
-    
+
     <div class="class-fees-section">
       <form id="class-fees-form">
         <h3><i class="fas fa-money-bill"></i> <span data-i18n="setClassFees">Set Class Fees</span></h3>

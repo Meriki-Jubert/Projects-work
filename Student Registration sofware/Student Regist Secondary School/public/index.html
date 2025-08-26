@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>School Registration System</title>
+  <meta name="description" content="Student Registration System - Manage student records, fees, and more">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
+  <title>School Registration System</title>
 </head>
 <body>
+  <div id="a11y-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <div class="container">
     <header class="header">
       <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
@@ -101,7 +103,7 @@
       </div>
       <div class="stat-card">
         <i class="fas fa-book fa-2x" style="color: var(--accent);"></i>
-        <div class="stat-number">10</div>
+        <div class="stat-number">7</div>
         <div class="stat-label" data-i18n="classes">Classes</div>
       </div>
     </div>
@@ -134,16 +136,19 @@
       <div class="search-input-group">
         <select id="search-series" class="input">
           <option value="">All Series</option>
-          <option value="A1">A1</option>
-          <option value="A2">A2</option>
-          <option value="C">C</option>
-          <option value="D">D</option>
-          <option value="A3">A3</option>
-          <option value="A4">A4</option>
-          <option value="S1">S1</option>
-          <option value="S2">S2</option>
-          <option value="S3">S3</option>
-          <option value="S4">S4</option>
+          <!-- Arts Series -->
+          <option value="A1">A1 - Literature & Languages</option>
+          <option value="A2">A2 - History & Geography</option>
+          <option value="A3">A3 - Economics & Sociology</option>
+          <option value="A4">A4 - Arts & Philosophy</option>
+          <!-- Science Series -->
+          <option value="S1">S1 - Mathematics & Physics</option>
+          <option value="S2">S2 - Biology & Geology</option>
+          <option value="S3">S3 - Technology & Engineering</option>
+          <option value="S4">S4 - Computer Science</option>
+          <!-- Commercial Series -->
+          <option value="C">C - Economics & Mathematics</option>
+          <option value="D">D - Economics & Geography</option>
         </select>
       </div>
       <div class="search-input-group">
@@ -250,7 +255,7 @@
                 <option value="" selected>-</option>
                 <option value="arts" data-i18n="arts">Arts</option>
                 <option value="science" data-i18n="science">Science</option>
-                <option value="comercial" data-i18n="comercial">Commercial</option>
+                <option value="commercial" data-i18n="commercial">Commercial</option>
                 <option value="general" data-i18n="general">General</option>
               </select>
             </div>
