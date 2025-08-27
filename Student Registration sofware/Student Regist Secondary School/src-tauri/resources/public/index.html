@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>School Registration System</title>
+  <meta name="description" content="Student Registration System - Manage student records, fees, and more">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
+  <title>School Registration System</title>
 </head>
 <body>
+  <div id="a11y-live-region" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <div class="container">
     <header class="header">
       <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
@@ -124,7 +126,7 @@
       </div>
       <div class="search-input-group">
         <select id="search-department" class="input">
-          <option value="" data-i18n="allDepartments">All Departments</option>
+          <option value="">All Departments</option>
           <option value="arts" data-i18n="arts">Arts</option>
           <option value="science" data-i18n="science">Science</option>
           <option value="commercial" data-i18n="commercial">Commercial</option>
@@ -134,7 +136,7 @@
       <div class="search-input-group">
         <select id="search-series" class="input">
           <option value="">All Series</option>
-          <p>Arts Series </p>
+          <!-- Arts Series -->
           <option value="A1">A1 - Literature & Languages</option>
           <option value="A2">A2 - History & Geography</option>
           <option value="A3">A3 - Economics & Sociology</option>
@@ -157,13 +159,13 @@
         </select>
       </div>
       <div class="search-input-group">
-        <input type="number" id="age-search" class="input" placeholder="Search by exact age" data-i18n="searchAgePlaceholder">
+        <input type="number" id="search-age" class="input" placeholder="Age..." data-i18n="age">
       </div>
       <div class="search-input-group">
-        <select id="fees-status" class="input">
+        <select id="search-fee-status" class="input">
           <option value="" data-i18n="allFeeStatus">All Fee Status</option>
-          <option value="completed" data-i18n="completed">Fees Completed</option>
-          <option value="owing" data-i18n="owing">Fees Owing</option>
+          <option value="completed" data-i18n="completed">Completed</option>
+          <option value="owing" data-i18n="owing">Owing</option>
         </select>
       </div>
       <div class="search-input-group">
@@ -314,13 +316,17 @@
     </div>
 
     <!-- Pagination controls -->
-    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:12px; justify-content:center; margin: 16px 0;">
-      <button id="prevPageBtn" class="btn" type="button">Prev</button>
+    <div id="pagination" class="pagination" style="display:flex; align-items:center; gap:8px; justify-content:center; margin: 16px 0;">
+      <button id="prevPageBtn" class="btn btn-secondary" type="button" disabled>
+        <i class="fas fa-chevron-left"></i> Prev
+      </button>
       <span id="pageInfo">Page 1</span>
-      <button id="nextPageBtn" class="btn" type="button">Next</button>
+      <button id="nextPageBtn" class="btn btn-secondary" type="button" disabled>
+        Next <i class="fas fa-chevron-right"></i>
+      </button>
       <span id="totalInfo" style="color:#666"></span>
     </div>
-
+    
     <div class="class-fees-section">
       <form id="class-fees-form">
         <h3><i class="fas fa-money-bill"></i> <span data-i18n="setClassFees">Set Class Fees</span></h3>

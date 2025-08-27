@@ -818,15 +818,48 @@ const db = new sqlite3.Database(dbPath, (err) => {
   app.put('/api/students/:id/inactivate', (req, res) => {
     const id = req.params.id;
     const nowIso = new Date().toISOString();
-    db.run(
-      "UPDATE students SET status='inactive', inactiveAt=? WHERE id=?",
-      [nowIso, id],
-      function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        if (this.changes === 0) return res.status(404).json({ error: 'Student not found' });
-        res.json({ success: true, id, inactiveAt: nowIso });
+    
+    console.log(`[API] Marking student ${id} as inactive at ${nowIso}`);
+    
+    // First, verify the student exists
+    db.get("SELECT id, status FROM students WHERE id = ?", [id], (err, row) => {
+      if (err) {
+        console.error('[API] Database error:', err);
+        return res.status(500).json({ error: 'Database error', details: err.message });
       }
-    );
+      
+      if (!row) {
+        console.log(`[API] Student ${id} not found`);
+        return res.status(404).json({ error: 'Student not found' });
+      }
+      
+      console.log(`[API] Current status for student ${id}:`, row.status);
+      
+      // Update the status
+      db.run(
+        "UPDATE students SET status = 'inactive', inactiveAt = ? WHERE id = ?",
+        [nowIso, id],
+        function (err) {
+          if (err) {
+            console.error('[API] Update error:', err);
+            return res.status(500).json({ error: 'Update failed', details: err.message });
+          }
+          
+          console.log(`[API] Student ${id} marked inactive, rows affected:`, this.changes);
+          
+          if (this.changes === 0) {
+            return res.status(400).json({ error: 'No changes made - student may already be inactive' });
+          }
+          
+          res.json({ 
+            success: true, 
+            id, 
+            inactiveAt: nowIso,
+            previousStatus: row.status
+          });
+        }
+      );
+    });
   });
 
   // Reactivate student

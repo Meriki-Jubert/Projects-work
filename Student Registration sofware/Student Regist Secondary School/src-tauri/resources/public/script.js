@@ -137,6 +137,10 @@ const i18n = {
     btnReactivate: 'Reactivate',
     btnDelete: 'Delete',
     btnPrint: 'Print',
+    notifStudentMarkedInactive: 'Student marked as inactive',
+    notifStudentReactivated: 'Student reactivated successfully',
+    confirmInactivate: 'Are you sure you want to mark this student as inactive?',
+    confirmReactivate: 'Are you sure you want to reactivate this student?',
     badgeInactive: 'Inactive',
     searchPlaceholder: 'Search by name or matricule...',
     phSchoolName: "e.g. St. Joseph's High School",
@@ -266,10 +270,14 @@ const i18n = {
     statusInactive: 'Inactif',
     statusAll: 'Tous',
     btnEdit: 'Modifier',
-    btnMarkInactive: 'Marquer inactif',
+    btnMarkInactive: 'Désactiver',
     btnReactivate: 'Réactiver',
     btnDelete: 'Supprimer',
     btnPrint: 'Imprimer',
+    notifStudentMarkedInactive: 'Élève marqué comme inactif',
+    notifStudentReactivated: 'Élève réactivé avec succès',
+    confirmInactivate: 'Êtes-vous sûr de vouloir marquer cet élève comme inactif ?',
+    confirmReactivate: 'Êtes-vous sûr de vouloir réactiver cet élève ?',
     badgeInactive: 'Inactif',
     searchPlaceholder: 'Rechercher par nom ou matricule...',
     phSchoolName: 'ex. Lycée St. Joseph',
@@ -532,19 +540,64 @@ const seriesSelect = document.getElementById('series');
 
 function updateDeptSeriesVisibility() {
   const val = classSelect ? classSelect.value : '';
+  const isForm3 = val === 'form3';
+  const isForm45 = val === 'form4' || val === 'form5';
   const isSixth = val === 'lower-sixth' || val === 'upper-sixth';
-  const isDept = isSixth || val === 'form4' || val === 'form5';
-  const isSeries = isSixth; // only for lower/upper sixth
+  const showDept = isForm3 || isForm45 || isSixth;
+  const showSeries = isSixth; // Series only for sixth form
 
-  if (deptGroup) deptGroup.style.display = isDept ? '' : 'none';
-  if (seriesGroup) seriesGroup.style.display = isSeries ? '' : 'none';
+  // Show/hide department and series groups
+  if (deptGroup) deptGroup.style.display = showDept ? '' : 'none';
+  if (seriesGroup) seriesGroup.style.display = showSeries ? '' : 'none';
 
   // Clear fields when hidden
-  if (!isDept && departmentSelect) departmentSelect.value = '';
-  if (!isSeries && seriesSelect) seriesSelect.value = '';
+  if (!showDept && departmentSelect) departmentSelect.value = '';
+  if (!showSeries && seriesSelect) seriesSelect.value = '';
   
-  // When series is visible, ensure options reflect chosen department
-  if (isSeries) updateSeriesOptions();
+  // Update department options based on class level
+  updateDepartmentOptions(val);
+  
+  // Update series options if needed
+  if (showSeries) updateSeriesOptions();
+}
+
+function updateDepartmentOptions(classLevel) {
+  if (!departmentSelect) return;
+  
+  // Save current value to restore after updating options
+  const currentValue = departmentSelect.value;
+  
+  // Clear existing options except the first one
+  while (departmentSelect.options.length > 1) {
+    departmentSelect.remove(1);
+  }
+  
+  // Add appropriate options based on class level
+  if (classLevel === 'form3') {
+    // Only Commercial and General for Form 3
+    addDepartmentOption('commercial', 'Commercial');
+    addDepartmentOption('general', 'General');
+  } else if (['form4', 'form5', 'lower-sixth', 'upper-sixth'].includes(classLevel)) {
+    // Commercial, Arts, Science for Forms 4-5 and Sixth Form
+    addDepartmentOption('commercial', 'Commercial');
+    addDepartmentOption('arts', 'Arts');
+    addDepartmentOption('science', 'Science');
+  }
+  
+  // Restore previous value if it's still valid
+  if (currentValue && Array.from(departmentSelect.options).some(opt => opt.value === currentValue)) {
+    departmentSelect.value = currentValue;
+  } else {
+    departmentSelect.value = '';
+  }
+}
+
+function addDepartmentOption(value, text) {
+  if (!departmentSelect) return;
+  const option = document.createElement('option');
+  option.value = value;
+  option.textContent = text;
+  departmentSelect.appendChild(option);
 }
 
 function updateSeriesOptions() {
@@ -552,7 +605,9 @@ function updateSeriesOptions() {
   const dept = (departmentSelect && departmentSelect.value) || '';
   const isArts = dept === 'arts';
   const isScience = dept === 'science';
-  // Iterate options and toggle visibility based on class on the option
+  const isCommercial = dept === 'commercial';
+  
+  // Iterate options and toggle visibility based on department
   Array.from(seriesSelect.options).forEach((opt, idx) => {
     // Always keep the first placeholder option visible
     if (idx === 0) {
@@ -561,17 +616,27 @@ function updateSeriesOptions() {
       opt.style.display = '';
       return;
     }
+    
     const isArtsSeries = opt.classList.contains('arts-series');
     const isScienceSeries = opt.classList.contains('science-series');
-    let visible = true;
-    if (isArts) visible = isArtsSeries;
-    else if (isScience) visible = isScienceSeries;
-    // Show/hide
+    const isCommercialSeries = opt.classList.contains('commercial-series');
+    
+    let visible = false;
+    if (isArts) {
+      visible = isArtsSeries;
+    } else if (isScience) {
+      visible = isScienceSeries;
+    } else if (isCommercial) {
+      visible = isCommercialSeries;
+    }
+    
+    // Show/hide the option
     opt.disabled = !visible;
     opt.hidden = !visible;
     opt.style.display = visible ? '' : 'none';
   });
-  // If current value is not allowed, reset
+  
+  // If current value is not allowed, reset it
   const current = seriesSelect.value;
   if (current) {
     const currentOpt = Array.from(seriesSelect.options).find(o => o.value === current);
@@ -810,7 +875,13 @@ async function fetchStudents() {
 // Render Student Cards List
 
 function renderStudents(studentList) {
+  console.log('Rendering students list:', studentList);
   const appGrid = document.getElementById('appGrid');
+  if (!appGrid) {
+    console.error('appGrid element not found!');
+    return;
+  }
+  
   // Remove all student cards (but keep the form as the first child)
   while (appGrid.children.length > 1) {
     appGrid.removeChild(appGrid.lastChild);
@@ -907,30 +978,55 @@ function renderStudentCard(student) {
   `;
 }
 
-//showNotification('Student added successfully', 'success');
- 
 // Use event delegation for dynamic elements
+let cardEventListenersAttached = false;
+
 function attachCardEventListeners() {
   const appGrid = document.getElementById('appGrid');
-  if (!appGrid) return;
+  if (!appGrid || cardEventListenersAttached) return;
+  
+  // Mark that we've attached the listeners
+  cardEventListenersAttached = true;
 
   // Single event listener for all card actions
-  appGrid.addEventListener('click', (e) => {
-    const editBtn = e.target.closest('.edit-btn');
-    const deleteBtn = e.target.closest('.delete-btn');
-    const printBtn = e.target.closest('.print-btn');
-    const inactivateBtn = e.target.closest('.inactivate-btn');
-    const reactivateBtn = e.target.closest('.reactivate-btn');
+  function handleGridClick(e) {
+    // Only process if the click is on a student card action button or its children
+    const card = e.target.closest('.student-card');
+    if (!card) return; // Ignore clicks outside student cards
+    
+    // Find which action button was clicked
+    const button = e.target.closest('button, a');
+    if (!button) return;
 
-    if (editBtn) onEditStudent(e);
-    else if (deleteBtn) onDeleteStudent(e);
-    else if (printBtn) onPrintSingleStudent(e);
-    else if (inactivateBtn) onInactivateStudent(e);
-    else if (reactivateBtn) onReactivateStudent(e);
-  });
+    // Only handle our specific action buttons
+    if (button.classList.contains('edit-btn') ||
+        button.classList.contains('delete-btn') ||
+        button.classList.contains('print-btn') ||
+        button.classList.contains('inactivate-btn') ||
+        button.classList.contains('reactivate-btn')) {
+      
+      // Prevent default and stop propagation only for our action buttons
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Route to the appropriate handler
+      if (button.classList.contains('edit-btn')) {
+        onEditStudent(e);
+      } else if (button.classList.contains('delete-btn')) {
+        onDeleteStudent(e);
+      } else if (button.classList.contains('print-btn')) {
+        onPrintSingleStudent(e);
+      } else if (button.classList.contains('inactivate-btn')) {
+        onInactivateStudent(e);
+      } else if (button.classList.contains('reactivate-btn')) {
+        onReactivateStudent(e);
+      }
+    }
+  }
+
+  // Add the event listener to the grid
+  appGrid.addEventListener('click', handleGridClick);
 }
-
-// Print Single Student Card
 
 async function onPrintSingleStudent(e) {
   try {
@@ -1293,77 +1389,237 @@ async function onEditStudent(e) {
   }
 }
 
-// Delete Student with confirmation
+// Helper function for confirmation dialogs
+function showConfirmationDialog(message, confirmText = 'OK', type = 'warning') {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('div');
+    dialog.className = 'confirmation-dialog';
+    dialog.innerHTML = `
+      <div class="confirmation-content">
+        <p>${message}</p>
+        <div class="confirmation-buttons">
+          <button class="btn btn-cancel">${t('Cancel')}</button>
+          <button class="btn btn-confirm btn-${type}">${confirmText}</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Handle clicks on the dialog
+    const handleClick = (e) => {
+      if (e.target === dialog) {
+        // Clicked on the overlay
+        document.body.removeChild(dialog);
+        resolve(false);
+      } else if (e.target.classList.contains('btn-cancel')) {
+        // Clicked on Cancel
+        document.body.removeChild(dialog);
+        resolve(false);
+      } else if (e.target.classList.contains('btn-confirm')) {
+        // Clicked on Confirm
+        document.body.removeChild(dialog);
+        resolve(true);
+      }
+    };
+    
+    dialog.addEventListener('click', handleClick);
+  });
+}
 
+// Delete Student with confirmation
 async function onDeleteStudent(e) {
+  // Prevent default and stop propagation to avoid multiple triggers
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!ensureLicenseActiveOrWarn()) return;
+  
   const btn = e.currentTarget;
   const card = e.target.closest('.student-card');
   if (!card) return;
+  
   const id = card.dataset.id;
   if (!id) return;
-  if (!confirm('Are you sure you want to delete this student?')) return;
+  
+  // Use our custom confirmation dialog
+  const confirmed = await showConfirmationDialog(
+    t('confirmDelete'),
+    t('btnDelete'),
+    'error'
+  );
+  
+  if (!confirmed) return;
 
   showLoader(t('loading'));
   setButtonLoading(btn, true, t('btnDelete'));
+  
   try {
     const res = await fetch(apiUrl(`/api/students/${id}`), { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete');
     
     await fetchStudents();
     showNotification(t('notifStudentDeleted'), 'success');
-  } catch (err) {
-    showNotification(t('notifErrorDeletingStudent'), 'error');
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    showNotification(tf('errorWithMessage', { message: error.message }), 'error');
   } finally {
     hideLoader();
     setButtonLoading(btn, false);
   }
 }
 
-// Mark student inactive
+// Inactivate student
 async function onInactivateStudent(e) {
+  // Prevent default to avoid any form submission or link following
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!ensureLicenseActiveOrWarn()) return;
-  const btn = e.currentTarget;
+  
+  const btn = e.target.closest('.inactivate-btn');
+  if (!btn) {
+    console.error('Inactivate button not found');
+    return;
+  }
+  
   const card = btn.closest('.student-card');
-  if (!card) return;
+  if (!card) {
+    console.error('Could not find student card element');
+    return;
+  }
+  
   const id = card.dataset.id;
-  if (!id) return;
-  if (!confirm('Mark this student as inactive?')) return;
-  showLoader(t('loading'));
-  setButtonLoading(btn, true, t('btnMarkInactive'));
+  if (!id) {
+    console.error('No student ID found on card');
+    showNotification('Error: Could not identify student', 'error');
+    return;
+  }
+  
+  // Use our custom confirmation dialog
+  const confirmed = await showConfirmationDialog(
+    t('confirmInactivate'),
+    t('btnMarkInactive'),
+    'warning'
+  );
+  
+  if (!confirmed) return;
+  
+  showLoader(t('processing'));
+  setButtonLoading(btn, true, t('processing'));
+  
   try {
-    const res = await fetch(apiUrl(`/api/students/${id}/inactivate`), { method: 'PUT' });
-    if (!res.ok) throw new Error('Failed to inactivate');
-    await fetchStudents();
+    console.log(`Inactivating student ${id}...`);
+    const response = await fetch(apiUrl(`/api/students/${id}/inactivate`), { 
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include' // Include cookies for session if needed
+    });
+    
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = data.error || `Failed to inactivate student (HTTP ${response.status})`;
+      console.error('Inactivation failed:', errorMsg, data);
+      throw new Error(errorMsg);
+    }
+    
+    console.log('Student inactivated successfully:', data);
     showNotification(t('notifStudentMarkedInactive'), 'success');
+    
+    // Force a complete refresh of the student list with current filters
+    await fetchStudents();
+    
   } catch (err) {
-    showNotification(tf('errorWithMessage', { message: err.message }), 'error');
+    console.error('Error inactivating student:', err);
+    const errorMessage = err.message.includes('Failed to fetch') 
+      ? 'Could not connect to the server. Please check your connection.'
+      : err.message || 'An unknown error occurred';
+      
+    showNotification(`Error: ${errorMessage}`, 'error');
   } finally {
     hideLoader();
-    setButtonLoading(btn, false);
+    setButtonLoading(btn, false, t('btnMarkInactive'));
   }
 }
 
 // Reactivate student
 async function onReactivateStudent(e) {
+  // Prevent default to avoid any form submission or link following
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!ensureLicenseActiveOrWarn()) return;
-  const btn = e.currentTarget;
+  
+  const btn = e.target.closest('.reactivate-btn');
+  if (!btn) {
+    console.error('Reactivate button not found');
+    return;
+  }
+  
   const card = btn.closest('.student-card');
-  if (!card) return;
+  if (!card) {
+    console.error('Could not find student card element');
+    return;
+  }
+  
   const id = card.dataset.id;
-  if (!id) return;
-  showLoader(t('loading'));
+  if (!id) {
+    console.error('No student ID found on card');
+    showNotification('Error: Could not identify student', 'error');
+    return;
+  }
+  
+  // Use our custom confirmation dialog
+  const confirmed = await showConfirmationDialog(
+    t('confirmReactivate'),
+    t('btnMarkActive'),
+    'success'
+  );
+  
+  if (!confirmed) return;
+  
+  showLoader(t('processing'));
   setButtonLoading(btn, true, t('btnReactivate'));
+  
   try {
-    const res = await fetch(apiUrl(`/api/students/${id}/reactivate`), { method: 'PUT' });
-    if (!res.ok) throw new Error('Failed to reactivate');
-    await fetchStudents();
+    console.log(`Reactivating student ${id}...`);
+    const response = await fetch(apiUrl(`/api/students/${id}/reactivate`), { 
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include' // Include cookies for session if needed
+    });
+    
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = data.error || `Failed to reactivate student (HTTP ${response.status})`;
+      console.error('Reactivation failed:', errorMsg, data);
+      throw new Error(errorMsg);
+    }
+    
+    console.log('Student reactivated successfully:', data);
     showNotification(t('notifStudentReactivated'), 'success');
+    
+    // Force a complete refresh of the student list with current filters
+    await fetchStudents();
+    
   } catch (err) {
-    showNotification(tf('errorWithMessage', { message: err.message }), 'error');
+    console.error('Error reactivating student:', err);
+    const errorMessage = err.message.includes('Failed to fetch') 
+      ? 'Could not connect to the server. Please check your connection.'
+      : err.message || 'An unknown error occurred';
+      
+    showNotification(`Error: ${errorMessage}`, 'error');
   } finally {
     hideLoader();
-    setButtonLoading(btn, false);
+    setButtonLoading(btn, false, t('btnReactivate'));
   }
 }
 
@@ -1552,7 +1808,7 @@ function printStudentsTable(studentsToPrint) {
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
       th { background-color: #f2f2f2; }
       .school-info { text-align: center; margin-bottom: 20px; }
-      .school-info img { max-width: 100px; max-height: 100px; }
+      .school-info img { max-width: 100px; max-height: 100px; border-radius: 50%; }
     </style>
   </head>
   <body>
@@ -1683,7 +1939,7 @@ async function fetchSchoolInfo() {
         }
         // Update the logo in the header when school info is fetched
         if (data.logo) {
-          head.innerHTML = `<img src="${apiUrl(data.logo)}" alt="${data.name} Logo" style="width: 50px; height: 50px;">`;
+          head.innerHTML = `<img src="${apiUrl(data.logo)}" alt="${data.name} Logo" style="width: 100px; height: 100px; border-radius: 50%;">`;
         }
       }
     }

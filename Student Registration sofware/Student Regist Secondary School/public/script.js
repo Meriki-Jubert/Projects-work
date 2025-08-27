@@ -137,6 +137,10 @@ const i18n = {
     btnReactivate: 'Reactivate',
     btnDelete: 'Delete',
     btnPrint: 'Print',
+    notifStudentMarkedInactive: 'Student marked as inactive',
+    notifStudentReactivated: 'Student reactivated successfully',
+    confirmInactivate: 'Are you sure you want to mark this student as inactive?',
+    confirmReactivate: 'Are you sure you want to reactivate this student?',
     badgeInactive: 'Inactive',
     searchPlaceholder: 'Search by name or matricule...',
     phSchoolName: "e.g. St. Joseph's High School",
@@ -266,10 +270,14 @@ const i18n = {
     statusInactive: 'Inactif',
     statusAll: 'Tous',
     btnEdit: 'Modifier',
-    btnMarkInactive: 'Marquer inactif',
+    btnMarkInactive: 'Désactiver',
     btnReactivate: 'Réactiver',
     btnDelete: 'Supprimer',
     btnPrint: 'Imprimer',
+    notifStudentMarkedInactive: 'Élève marqué comme inactif',
+    notifStudentReactivated: 'Élève réactivé avec succès',
+    confirmInactivate: 'Êtes-vous sûr de vouloir marquer cet élève comme inactif ?',
+    confirmReactivate: 'Êtes-vous sûr de vouloir réactiver cet élève ?',
     badgeInactive: 'Inactif',
     searchPlaceholder: 'Rechercher par nom ou matricule...',
     phSchoolName: 'ex. Lycée St. Joseph',
@@ -971,24 +979,53 @@ function renderStudentCard(student) {
 }
 
 // Use event delegation for dynamic elements
+let cardEventListenersAttached = false;
+
 function attachCardEventListeners() {
   const appGrid = document.getElementById('appGrid');
-  if (!appGrid) return;
+  if (!appGrid || cardEventListenersAttached) return;
+  
+  // Mark that we've attached the listeners
+  cardEventListenersAttached = true;
 
   // Single event listener for all card actions
-  appGrid.addEventListener('click', (e) => {
-    const editBtn = e.target.closest('.edit-btn');
-    const deleteBtn = e.target.closest('.delete-btn');
-    const printBtn = e.target.closest('.print-btn');
-    const inactivateBtn = e.target.closest('.inactivate-btn');
-    const reactivateBtn = e.target.closest('.reactivate-btn');
+  function handleGridClick(e) {
+    // Only process if the click is on a student card action button or its children
+    const card = e.target.closest('.student-card');
+    if (!card) return; // Ignore clicks outside student cards
+    
+    // Find which action button was clicked
+    const button = e.target.closest('button, a');
+    if (!button) return;
 
-    if (editBtn) onEditStudent(e);
-    else if (deleteBtn) onDeleteStudent(e);
-    else if (printBtn) onPrintSingleStudent(e);
-    else if (inactivateBtn) onInactivateStudent(e);
-    else if (reactivateBtn) onReactivateStudent(e);
-  });
+    // Only handle our specific action buttons
+    if (button.classList.contains('edit-btn') ||
+        button.classList.contains('delete-btn') ||
+        button.classList.contains('print-btn') ||
+        button.classList.contains('inactivate-btn') ||
+        button.classList.contains('reactivate-btn')) {
+      
+      // Prevent default and stop propagation only for our action buttons
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Route to the appropriate handler
+      if (button.classList.contains('edit-btn')) {
+        onEditStudent(e);
+      } else if (button.classList.contains('delete-btn')) {
+        onDeleteStudent(e);
+      } else if (button.classList.contains('print-btn')) {
+        onPrintSingleStudent(e);
+      } else if (button.classList.contains('inactivate-btn')) {
+        onInactivateStudent(e);
+      } else if (button.classList.contains('reactivate-btn')) {
+        onReactivateStudent(e);
+      }
+    }
+  }
+
+  // Add the event listener to the grid
+  appGrid.addEventListener('click', handleGridClick);
 }
 
 async function onPrintSingleStudent(e) {
@@ -1352,77 +1389,237 @@ async function onEditStudent(e) {
   }
 }
 
-// Delete Student with confirmation
+// Helper function for confirmation dialogs
+function showConfirmationDialog(message, confirmText = 'OK', type = 'warning') {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('div');
+    dialog.className = 'confirmation-dialog';
+    dialog.innerHTML = `
+      <div class="confirmation-content">
+        <p>${message}</p>
+        <div class="confirmation-buttons">
+          <button class="btn btn-cancel">${t('Cancel')}</button>
+          <button class="btn btn-confirm btn-${type}">${confirmText}</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Handle clicks on the dialog
+    const handleClick = (e) => {
+      if (e.target === dialog) {
+        // Clicked on the overlay
+        document.body.removeChild(dialog);
+        resolve(false);
+      } else if (e.target.classList.contains('btn-cancel')) {
+        // Clicked on Cancel
+        document.body.removeChild(dialog);
+        resolve(false);
+      } else if (e.target.classList.contains('btn-confirm')) {
+        // Clicked on Confirm
+        document.body.removeChild(dialog);
+        resolve(true);
+      }
+    };
+    
+    dialog.addEventListener('click', handleClick);
+  });
+}
 
+// Delete Student with confirmation
 async function onDeleteStudent(e) {
+  // Prevent default and stop propagation to avoid multiple triggers
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!ensureLicenseActiveOrWarn()) return;
+  
   const btn = e.currentTarget;
   const card = e.target.closest('.student-card');
   if (!card) return;
+  
   const id = card.dataset.id;
   if (!id) return;
-  if (!confirm('Are you sure you want to delete this student?')) return;
+  
+  // Use our custom confirmation dialog
+  const confirmed = await showConfirmationDialog(
+    t('confirmDelete'),
+    t('btnDelete'),
+    'error'
+  );
+  
+  if (!confirmed) return;
 
   showLoader(t('loading'));
   setButtonLoading(btn, true, t('btnDelete'));
+  
   try {
     const res = await fetch(apiUrl(`/api/students/${id}`), { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete');
     
     await fetchStudents();
     showNotification(t('notifStudentDeleted'), 'success');
-  } catch (err) {
-    showNotification(t('notifErrorDeletingStudent'), 'error');
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    showNotification(tf('errorWithMessage', { message: error.message }), 'error');
   } finally {
     hideLoader();
     setButtonLoading(btn, false);
   }
 }
 
-// Mark student inactive
+// Inactivate student
 async function onInactivateStudent(e) {
+  // Prevent default to avoid any form submission or link following
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!ensureLicenseActiveOrWarn()) return;
-  const btn = e.currentTarget;
+  
+  const btn = e.target.closest('.inactivate-btn');
+  if (!btn) {
+    console.error('Inactivate button not found');
+    return;
+  }
+  
   const card = btn.closest('.student-card');
-  if (!card) return;
+  if (!card) {
+    console.error('Could not find student card element');
+    return;
+  }
+  
   const id = card.dataset.id;
-  if (!id) return;
-  if (!confirm('Mark this student as inactive?')) return;
-  showLoader(t('loading'));
-  setButtonLoading(btn, true, t('btnMarkInactive'));
+  if (!id) {
+    console.error('No student ID found on card');
+    showNotification('Error: Could not identify student', 'error');
+    return;
+  }
+  
+  // Use our custom confirmation dialog
+  const confirmed = await showConfirmationDialog(
+    t('confirmInactivate'),
+    t('btnMarkInactive'),
+    'warning'
+  );
+  
+  if (!confirmed) return;
+  
+  showLoader(t('processing'));
+  setButtonLoading(btn, true, t('processing'));
+  
   try {
-    const res = await fetch(apiUrl(`/api/students/${id}/inactivate`), { method: 'PUT' });
-    if (!res.ok) throw new Error('Failed to inactivate');
-    await fetchStudents();
+    console.log(`Inactivating student ${id}...`);
+    const response = await fetch(apiUrl(`/api/students/${id}/inactivate`), { 
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include' // Include cookies for session if needed
+    });
+    
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = data.error || `Failed to inactivate student (HTTP ${response.status})`;
+      console.error('Inactivation failed:', errorMsg, data);
+      throw new Error(errorMsg);
+    }
+    
+    console.log('Student inactivated successfully:', data);
     showNotification(t('notifStudentMarkedInactive'), 'success');
+    
+    // Force a complete refresh of the student list with current filters
+    await fetchStudents();
+    
   } catch (err) {
-    showNotification(tf('errorWithMessage', { message: err.message }), 'error');
+    console.error('Error inactivating student:', err);
+    const errorMessage = err.message.includes('Failed to fetch') 
+      ? 'Could not connect to the server. Please check your connection.'
+      : err.message || 'An unknown error occurred';
+      
+    showNotification(`Error: ${errorMessage}`, 'error');
   } finally {
     hideLoader();
-    setButtonLoading(btn, false);
+    setButtonLoading(btn, false, t('btnMarkInactive'));
   }
 }
 
 // Reactivate student
 async function onReactivateStudent(e) {
+  // Prevent default to avoid any form submission or link following
+  e.preventDefault();
+  e.stopPropagation();
+  
   if (!ensureLicenseActiveOrWarn()) return;
-  const btn = e.currentTarget;
+  
+  const btn = e.target.closest('.reactivate-btn');
+  if (!btn) {
+    console.error('Reactivate button not found');
+    return;
+  }
+  
   const card = btn.closest('.student-card');
-  if (!card) return;
+  if (!card) {
+    console.error('Could not find student card element');
+    return;
+  }
+  
   const id = card.dataset.id;
-  if (!id) return;
-  showLoader(t('loading'));
+  if (!id) {
+    console.error('No student ID found on card');
+    showNotification('Error: Could not identify student', 'error');
+    return;
+  }
+  
+  // Use our custom confirmation dialog
+  const confirmed = await showConfirmationDialog(
+    t('confirmReactivate'),
+    t('btnMarkActive'),
+    'success'
+  );
+  
+  if (!confirmed) return;
+  
+  showLoader(t('processing'));
   setButtonLoading(btn, true, t('btnReactivate'));
+  
   try {
-    const res = await fetch(apiUrl(`/api/students/${id}/reactivate`), { method: 'PUT' });
-    if (!res.ok) throw new Error('Failed to reactivate');
-    await fetchStudents();
+    console.log(`Reactivating student ${id}...`);
+    const response = await fetch(apiUrl(`/api/students/${id}/reactivate`), { 
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      credentials: 'include' // Include cookies for session if needed
+    });
+    
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = data.error || `Failed to reactivate student (HTTP ${response.status})`;
+      console.error('Reactivation failed:', errorMsg, data);
+      throw new Error(errorMsg);
+    }
+    
+    console.log('Student reactivated successfully:', data);
     showNotification(t('notifStudentReactivated'), 'success');
+    
+    // Force a complete refresh of the student list with current filters
+    await fetchStudents();
+    
   } catch (err) {
-    showNotification(tf('errorWithMessage', { message: err.message }), 'error');
+    console.error('Error reactivating student:', err);
+    const errorMessage = err.message.includes('Failed to fetch') 
+      ? 'Could not connect to the server. Please check your connection.'
+      : err.message || 'An unknown error occurred';
+      
+    showNotification(`Error: ${errorMessage}`, 'error');
   } finally {
     hideLoader();
-    setButtonLoading(btn, false);
+    setButtonLoading(btn, false, t('btnReactivate'));
   }
 }
 
@@ -1611,7 +1808,7 @@ function printStudentsTable(studentsToPrint) {
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
       th { background-color: #f2f2f2; }
       .school-info { text-align: center; margin-bottom: 20px; }
-      .school-info img { max-width: 100px; max-height: 100px; }
+      .school-info img { max-width: 100px; max-height: 100px; border-radius: 50%; }
     </style>
   </head>
   <body>
@@ -1742,7 +1939,7 @@ async function fetchSchoolInfo() {
         }
         // Update the logo in the header when school info is fetched
         if (data.logo) {
-          head.innerHTML = `<img src="${apiUrl(data.logo)}" alt="${data.name} Logo" style="width: 50px; height: 50px;">`;
+          head.innerHTML = `<img src="${apiUrl(data.logo)}" alt="${data.name} Logo" style="width: 100px; height: 100px; border-radius: 50%;">`;
         }
       }
     }
